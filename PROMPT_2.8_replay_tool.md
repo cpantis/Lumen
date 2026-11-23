@@ -16,6 +16,66 @@ Nu ai documentație, nu ai codul componentei și nu ai voie să presupui nume de
 
 **Scopul aplicației:** o persoană trebuie să poată vedea, **în orice moment al înregistrării**, ce a intrat în componentă și ce a ieșit din ea, cu toate fluxurile sincronizate în timp.
 
+**Cine o folosește:** inginerii de test, dezvoltatorii și product managerii .lumen. Trebuie să arate și să se comporte ca un **produs intern profesional .lumen**, în linie cu identitatea de pe https://www.dotlumen.com/ro, nu ca un prototip de hackathon. Trebuie să poată fi prezentată unui client sau unui investitor fără jenă.
+
+## Identitate vizuală (extrasă de pe dotlumen.com și din logo-ul din documentul challenge-ului)
+
+**Ton și poziționare.** .lumen se prezintă ca „Inteligență Artificială Pietonală” (*Pedestrian Autonomous Driving AI*), „cea mai avansată tehnologie asistivă din lume” și „conducerea automată redusă la ceva ce poți purta”. Ochelarii „reproduc caracteristicile principale ale unui câine ghid”. Stilul este sobru, tehnologic și încrezător, fără ornamente. În aplicație folosește aceeași terminologie: *Ochelari .lumen*, *Pedestrian AI*, *câmp vizual (FOV)*, *intrări senzori* / *ieșiri componentă*.
+
+**Logo.** Numele se scrie **`.lumen`**, mereu cu litere mici și cu punct în față. Simbolul este o grilă de 3 × 4 puncte în stil Braille: puncte gri `#B2B2B2`, iar câteva puncte și textul în aproape-negru `#161619`. Wordmark-ul are un font geometric subțire, cu linie fină și rotunjită.
+- Recreează logo-ul ca **SVG inline** (grila de puncte + „.lumen”), în variantă albă pentru tema închisă și neagră pentru tema deschisă.
+- Folosește grila Braille și ca motiv discret: animație de încărcare (punctele se aprind pe rând), favicon, empty states.
+
+**Paletă (tokenuri CSS pe `:root`).**
+
+| Token | Rol | Temă închisă (implicită) | Temă deschisă |
+|---|---|---|---|
+| `--bg` | fundal aplicație | `#000000` | `#FFFFFF` |
+| `--surface` | panouri | `#0E0E10` | `#F5F5F5` |
+| `--surface-2` | carduri / hover | `#161619` | `#E8EAED` |
+| `--border` | linii subțiri | `#2A2A2E` | `#E3E3E3` |
+| `--text` | text principal | `#FFFFFF` | `#161619` |
+| `--text-muted` | text secundar | `#8F8F8F` | `#4F4F4F` |
+| `--dot` | puncte logo / neutru | `#B2B2B2` | `#979797` |
+| `--accent` | acțiune principală, cursor timeline, focus | `#77E8CA` (mentă) | `#00263D` (bleumarin) |
+| `--accent-2` | link-uri, selecție, al doilea FOV | `#384AD3` | `#384AD3` |
+| `--ok` / `--warn` / `--error` | stări | `#77E8CA` / `#FFCB05` / `#ED1C24` | `#1E8A6E` / `#B38A00` / `#C8102E` |
+
+Culorile de stare se folosesc **numai pentru stare**, nu decorativ. Intrările și ieșirile primesc fiecare câte o culoare constantă în toată aplicația, aceeași pe timeline, în antetul panourilor și în grafice (de exemplu intrări = `--dot`, FOV 1 = `--accent`, FOV 2 = `--accent-2`).
+
+**Tipografie.** Site-ul folosește un font geometric subțire, cu Poppins (ExtraLight / SemiBold) și DIN Next Light ca alternative. În aplicație:
+- titluri: **Poppins 200–300**, mari și aerisite;
+- etichete și butoane: **Poppins 500–600**;
+- valori numerice, timestamp-uri și ID-uri de topic: **JetBrains Mono** (sau `ui-monospace`), cu `font-variant-numeric: tabular-nums`, ca cifrele să nu „sară” la redare.
+
+Fonturile se încarcă din Google Fonts.
+
+**Layout și componente.**
+- Stil minimalist, mult spațiu negativ, grilă de 8 px, linii de 1 px în loc de umbre, colțuri mici (6–8 px) pe panouri.
+- Butoane **pill** (`border-radius: 50px`), ca pe site: cel principal plin cu `--accent` și text negru, cel secundar cu contur subțire.
+- Bară de sus neagră și simplă: logo `.lumen` în stânga, numele fișierului încărcat și durata în centru, iar în dreapta comutator de temă, ajutor (`?`) și setări.
+- Iconițe line, subțiri și consistente (Lucide).
+- Animații scurte (150–200 ms), dezactivate la `prefers-reduced-motion`.
+
+**Accesibilitate (obligatoriu — .lumen face tehnologie asistivă și are pe site o *Declarație de accesibilitate*).**
+- **WCAG 2.2 AA**: contrast ≥ 4.5:1 pentru text și ≥ 3:1 pentru elemente grafice, verificat automat (axe-core în testele Playwright).
+- Totul se poate folosi din tastatură: ordine logică a focusului, inel de focus vizibil `--accent` de 2 px, skip link.
+- Elementele interactive au ARIA corect. Timeline-ul este un `slider` cu `aria-valuetext` în format citibil („12,4 secunde din 95”).
+- Mod **contrast ridicat** și scalare a textului până la 200% fără ca layout-ul să se strice.
+- Starea nu e transmisă **niciodată doar prin culoare**: fiecare stare are și o iconiță sau un text (OK / Expirat / Gol / Invalid).
+- O regiune `aria-live` anunță evenimentele importante în timpul redării (de exemplu „gol de date pe /camera/front: 340 ms”).
+
+**Interfață în română, cu opțiune EN** (i18n cu fișiere de traduceri), ca pe site.
+
+## UX profesional
+- **Ecran de start** curat: logo, titlul „Replay — Ochelari .lumen”, o zonă mare de drag & drop și lista ultimelor fișiere deschise (numai numele, din `localStorage`).
+- **Stări complete** pentru fiecare ecran: încărcare (skeleton + grila Braille animată), gol, eroare cu mesaj clar și acțiune propusă, succes.
+- **Paletă de comenzi** (Ctrl/⌘ + K) pentru salt la topic, timestamp sau eșec de test și schimbarea layoutului. Lista comenzilor rapide se deschide cu `?`.
+- **Tooltips** pe fiecare control și un **tur ghidat** la prima utilizare (3–5 pași, care poate fi sărit).
+- **Inspector lateral**, care poate fi ascuns, cu detaliile mesajului selectat: header, stamp, dimensiune, câmpuri.
+- Toate unitățile sunt afișate explicit (ms, Hz, m, m/s², rad/s), iar numerele sunt formatate consecvent.
+- Interfața se adaptează la ecrane de la 1280 px la 4K. Pe tabletă sau telefon rămâne utilizabilă în modul vizualizare (un singur panou + timeline).
+
 ## Constrângeri tehnice
 
 - **Nu se instalează ROS.** Citirea se face direct din MCAP.
@@ -83,12 +143,14 @@ Nu ai documentație, nu ai codul componentei și nu ai voie să presupui nume de
 ## Calitate și livrabile
 - Cod TypeScript strict, modular (`reader/`, `decode/`, `sync/`, `panels/`, `timeline/`, `state/`), cu JSDoc pe funcțiile publice.
 - **Teste unitare** (Vitest) pentru logica critică: căutarea ultimului mesaj ≤ t (binary search), detectarea golurilor, calculul frecvenței și jitterului, asocierea ieșire → intrare după stamp, decodarea encodingurilor de imagine. Adaugă un mic fișier MCAP sintetic, generat de un script din repo, pentru teste reproductibile.
-- Un **test end-to-end** (Playwright): încarcă MCAP-ul sintetic, rulează play, face scrub și verifică faptul că panourile se actualizează.
+- Un **test end-to-end** (Playwright): încarcă MCAP-ul sintetic, rulează play, face scrub și verifică faptul că panourile se actualizează. Include și un audit de accesibilitate cu `@axe-core/playwright` (zero încălcări serioase), în ambele teme.
+- Capturi de ecran în temele închisă și deschisă, incluse în README.
 - `README.md` cu: arhitectura (diagramă), cum se rulează (o singură comandă), cum se folosește (GIF sau capturi), limitări cunoscute și presupuneri.
 - Un paragraf gata de inclus în secțiunea „Implementation” a documentului challenge-ului, care descrie tool-ul, deciziile tehnice și cum ajută la analiza componentei.
 
 ## Mod de lucru
-1. Începe cu un script de inspecție care listează topicurile, tipurile, schemele și statisticile din fișierul real, ca să confirmi ce trebuie suportat.
+0. Definește întâi **design system-ul** (tokenuri CSS, tipografie, butoane, panou, antet de panou, badge-uri de stare, logo SVG) într-o pagină `/styleguide`, ca să poată fi verificat vizual înainte de restul aplicației.
+1. Continuă cu un script de inspecție care listează topicurile, tipurile, schemele și statisticile din fișierul real, ca să confirmi ce trebuie suportat.
 2. Implementează incremental: reader + inventar → timeline + sincronizare → panouri de imagine → 3D → asociere ieșire → intrare și latență → suprapuneri → import de raport → export.
 3. După fiecare etapă, rulează testele și verifică vizual în browser.
 4. Declară explicit orice presupunere făcută acolo unde datele nu spun ceva.
