@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+fixtures/*.mcap
+test-results/
+playwright-report/
+*.tsbuildinfo
