@@ -16,7 +16,8 @@ import { tr } from "../i18n";
 export function PanelFrame({
   cfg,
   topic,
-  index,
+  index: wanted,
+  shown,
   title,
   matchedFrom,
   children,
@@ -26,7 +27,10 @@ export function PanelFrame({
 }: {
   cfg: PanelConfig;
   topic?: TopicData;
+  /** message the cursor asks for */
   index: number;
+  /** message actually drawn (when the panel decodes asynchronously); defaults to `index` */
+  shown?: number;
   title?: string;
   matchedFrom?: string;
   children: ReactNode;
@@ -34,6 +38,11 @@ export function PanelFrame({
   toolbar?: ReactNode;
   error?: string;
 }) {
+  // The header always describes what is DRAWN, never just what was requested: while the
+  // requested message is still being decoded, index/age refer to the displayed one and the
+  // status says "Loading", so a stale frame can never be mistaken for the current one.
+  const index = shown ?? wanted;
+  const pending = shown !== undefined && wanted >= 0 && shown !== wanted;
   const age = useAge(topic, index);
   const highlight = useApp((s) => s.highlightTopics.includes(cfg.topic) || (!!cfg.topic2 && s.highlightTopics.includes(cfg.topic2)));
   const a = useApp((s) => s.analysis);
@@ -44,6 +53,7 @@ export function PanelFrame({
     else if (topic.content.empty[index]) status = "empty";
     else status = matchedFrom ? "ok" : (staleness(age, topic.rate.medianPeriodNs) as StatusKind);
   }
+  if (pending) status = "loading";
   const role = topic ? effectiveRole(topic, s) : "unknown";
   const fov = topic ? effectiveFov(topic, s) : undefined;
   const outputsOfInput = topic && a ? a.edges.filter((e) => e.input === topic.topic).map((e) => e.output) : [];

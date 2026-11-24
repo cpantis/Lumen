@@ -2,7 +2,7 @@
  * UI primitives of the StampTrace design system: logo, buttons, status badges, modal,
  * global tooltips (data-tip), braille loader, key/value lists, file pickers.
  */
-import { AlertTriangle, CheckCircle2, CircleSlash, Clock3, HelpCircle, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleSlash, Clock3, HelpCircle, Loader2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { tr } from "../i18n";
 
@@ -34,7 +34,7 @@ export function Logo({ height = 22, title = "StampTrace", mark = false }: { heig
   );
 }
 
-export type StatusKind = "ok" | "warn" | "stale" | "none" | "empty" | "invalid" | "pass" | "fail" | "na";
+export type StatusKind = "ok" | "warn" | "stale" | "none" | "empty" | "invalid" | "pass" | "fail" | "na" | "loading";
 
 /** Status badge — colour + icon + text (never colour alone, WCAG 1.4.1). */
 export function StatusBadge({ kind, label }: { kind: StatusKind; label?: string }) {
@@ -48,6 +48,7 @@ export function StatusBadge({ kind, label }: { kind: StatusKind; label?: string 
     empty: { cls: "warn", icon: <CircleSlash aria-hidden />, text: "Empty" },
     invalid: { cls: "error", icon: <XCircle aria-hidden />, text: "Invalid" },
     na: { cls: "neutral", icon: <HelpCircle aria-hidden />, text: "N/A" },
+    loading: { cls: "neutral", icon: <Loader2 aria-hidden className="spin" />, text: "Loading" },
   };
   const m = map[kind];
   return (

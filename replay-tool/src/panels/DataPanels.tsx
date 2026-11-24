@@ -94,7 +94,7 @@ export function CameraInfoPanel({ cfg, topic }: { cfg: PanelConfig; topic: Topic
   const m = msg?.msg as { width: number; height: number; distortion_model: string; d: number[]; k: number[]; p: number[]; header: { frame_id: string } } | undefined;
   const arr = (a?: ArrayLike<number>) => (a ? `[${Array.from(a).map((v) => (+v).toFixed(2)).join(", ")}]` : "—");
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error}>
       <div className="panel-body scroll" tabIndex={0} style={{ position: "absolute", inset: 0, padding: 12 }}>
         {m && (
           <Kv
@@ -139,7 +139,7 @@ export function GridPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
     ctx.putImageData(img, 0, 0);
   }, [msg]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tr("gri = necunoscut, negru = ocupat")}</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{tr("gri = necunoscut, negru = ocupat")}</span>}>
       <canvas ref={canvas} style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated" }} role="img" aria-label={tr("Grilă de ocupare")} />
     </PanelFrame>
   );
@@ -167,7 +167,7 @@ export function ScanPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
     }
   }, [msg]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error}>
       <canvas ref={canvas} role="img" aria-label={tr("Scanare laser")} />
     </PanelFrame>
   );
@@ -228,7 +228,7 @@ export function GenericPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicDat
   const { index } = usePanelIndex(topic);
   const { msg } = useDecoded(topic.topic, index);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tr("apasă ⌁ lângă un câmp numeric pentru grafic în timp")}</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{tr("apasă ⌁ lângă un câmp numeric pentru grafic în timp")}</span>}>
       <div className="panel-body scroll json" tabIndex={0} style={{ position: "absolute", inset: 0, padding: 8 }}>
         {msg?.msg !== undefined ? <JsonTree value={msg.msg} topic={topic.topic} /> : index < 0 ? <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div> : null}
       </div>

@@ -53,6 +53,7 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       cfg={cfg}
       topic={topic}
       index={index}
+      shown={msg ? msg.index : -1}
       error={msg?.error}
       toolbar={
         <>
@@ -124,7 +125,7 @@ export function TfPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }) 
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tfs.length} transforms</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{tfs.length} transforms</span>}>
       <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
         <div ref={ref} style={{ position: "relative" }} />
         <div className="panel-body scroll" tabIndex={0} style={{ padding: 8, fontSize: 11 }}>
@@ -204,7 +205,7 @@ export function MarkerPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{markers.length} markers</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{markers.length} markers</span>}>
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
     </PanelFrame>
   );
@@ -225,7 +226,7 @@ export function PosePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
     a.render();
   }, [msg]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={pose?.position ? <span>p=({pose.position.x.toFixed(2)}, {pose.position.y.toFixed(2)}, {pose.position.z.toFixed(2)}) m</span> : null}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={pose?.position ? <span>p=({pose.position.x.toFixed(2)}, {pose.position.y.toFixed(2)}, {pose.position.z.toFixed(2)}) m</span> : null}>
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
     </PanelFrame>
   );

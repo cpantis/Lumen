@@ -170,13 +170,14 @@ export function CommandPalette() {
     }
     return list;
   }, [s.analysis, s.profile, s.reports, s.bugs, T]); // eslint-disable-line react-hooks/exhaustive-deps
-  const tq = parseTimeInput(q);
-  const filtered = useMemo(() => {
-    const ql = q.toLowerCase();
+  const filterFor = (query: string): Cmd[] => {
+    const ql = query.toLowerCase();
+    const tq = parseTimeInput(query);
     const out = cmds.filter((c) => !ql || c.label.toLowerCase().includes(ql) || c.group.includes(ql)).slice(0, 60);
     if (tq !== undefined && s.analysis) out.unshift({ group: "time", label: `Jump to ${(tq / 1e9).toFixed(3)} s`, run: () => { setPlaying(false); seek(tq); app.set({ view: "replay" }); } });
     return out;
-  }, [cmds, q, tq, s.analysis]);
+  };
+  const filtered = useMemo(() => filterFor(q), [cmds, q, s.analysis]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setSel(0), [q]);
   if (!open) return null;
   const close = () => {
@@ -200,9 +201,14 @@ export function CommandPalette() {
             if (e.key === "Escape") close();
             if (e.key === "ArrowDown") (e.preventDefault(), setSel(Math.min(filtered.length - 1, sel + 1)));
             if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(0, sel - 1)));
-            if (e.key === "Enter" && filtered[sel]) {
-              filtered[sel].run();
-              close();
+            if (e.key === "Enter") {
+              // read the live input value: Enter can arrive before React re-rendered the last keystroke
+              const live = e.currentTarget.value;
+              const cmd = live === q ? filtered[sel] : filterFor(live)[0];
+              if (cmd) {
+                cmd.run();
+                close();
+              }
             }
           }}
         />

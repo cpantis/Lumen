@@ -103,6 +103,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       cfg={cfg}
       topic={topic}
       index={index}
+      shown={msg ? msg.index : -1}
       matchedFrom={matchedFrom}
       error={msg?.error}
       toolbar={
@@ -119,7 +120,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
         <>
           <span>{msg?.width ? `${msg.width}×${msg.height} ${img?.encoding ?? (msg?.msg as { format?: string })?.format ?? ""}` : ""}</span>
           <span style={{ color: "var(--text)" }}>{readout}</span>
-          <UsageInfo topic={topic} index={index} />
+          <UsageInfo topic={topic} index={msg ? msg.index : -1} />
         </>
       }
     >

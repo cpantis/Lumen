@@ -1048,3 +1048,17 @@ table.t tr[aria-selected="true"] td {
     grid-template-columns: 1fr;
   }
 }
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

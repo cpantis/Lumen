@@ -54,6 +54,63 @@ function topicData(topic: string) {
   return t;
 }
 
+/**
+ * Raw-message cache. McapIndexedReader decompresses a whole chunk for every
+ * readMessages() call, so serving each panel (and each prefetch) separately would
+ * decompress the same chunk many times. Instead, the first request for a moment loads
+ * every message of the chunk(s) covering it, for all channels, into this map:
+ * key "channelId:logTime" → messages with that log time (in file order).
+ * Overwriting a key with a freshly loaded range is always complete, because a key lies
+ * entirely inside any time range that contains its log time.
+ */
+const rawByKey = new Map<string, Uint8Array[]>();
+const loadedRanges: Array<{ keys: string[]; bytes: number }> = [];
+const inflightRanges = new Map<string, Promise<void>>();
+let rawBytes = 0;
+const RAW_BUDGET = 300 << 20;
+
+async function loadRangeAround(abs: bigint): Promise<void> {
+  const reader = opened!.reader!;
+  const cis = reader.chunkIndexes.filter((c) => c.messageStartTime <= abs && abs <= c.messageEndTime);
+  if (!cis.length) return;
+  let lo = cis[0].messageStartTime, hi = cis[0].messageEndTime;
+  for (const c of cis) {
+    if (c.messageStartTime < lo) lo = c.messageStartTime;
+    if (c.messageEndTime > hi) hi = c.messageEndTime;
+  }
+  const rk = `${lo}-${hi}`;
+  const pending = inflightRanges.get(rk);
+  if (pending) return pending;
+  const job = (async () => {
+    const fresh = new Map<string, Uint8Array[]>();
+    let bytes = 0;
+    for await (const m of reader.readMessages({ startTime: lo, endTime: hi })) {
+      const key = `${m.channelId}:${m.logTime}`;
+      const arr = fresh.get(key);
+      if (arr) arr.push(m.data);
+      else fresh.set(key, [m.data]);
+      bytes += m.data.length;
+    }
+    for (const [k, v] of fresh) rawByKey.set(k, v);
+    loadedRanges.push({ keys: [...fresh.keys()], bytes });
+    rawBytes += bytes;
+    while (rawBytes > RAW_BUDGET && loadedRanges.length > 1) {
+      const old = loadedRanges.shift()!;
+      for (const k of old.keys) rawByKey.delete(k);
+      rawBytes -= old.bytes;
+    }
+  })();
+  inflightRanges.set(rk, job);
+  try {
+    await job;
+  } finally {
+    inflightRanges.delete(rk);
+  }
+}
+
+/** Sequential (un-indexed) recordings: one-time index of the in-memory messages. */
+let seqIndex: Map<string, Uint8Array[]> | undefined;
+
 /** Reads the raw bytes of message #index of a topic. */
 async function readRaw(topic: string, index: number): Promise<Uint8Array | undefined> {
   if (!opened || !analysis) return undefined;
@@ -63,18 +120,25 @@ async function readRaw(topic: string, index: number): Promise<Uint8Array | undef
   // several messages can share one log time: take the right occurrence
   let occurrence = 0;
   for (let j = index - 1; j >= 0 && t.log[j] === rel; j--) occurrence++;
+  const key = `${t.channelId}:${abs}`;
   if (opened.indexed && opened.reader) {
-    let k = 0;
-    for await (const m of opened.reader.readMessages({ topics: [topic], startTime: abs, endTime: abs })) {
-      if (k++ === occurrence) return m.data;
+    let hit = rawByKey.get(key);
+    if (!hit || hit.length <= occurrence) {
+      await loadRangeAround(abs);
+      hit = rawByKey.get(key);
     }
-    return undefined;
+    return hit?.[occurrence];
   }
-  let k = 0;
-  for (const m of opened.messages ?? []) {
-    if (m.logTime === abs && opened.channels.get(m.channelId)?.topic === topic) if (k++ === occurrence) return m.data;
+  if (!seqIndex) {
+    seqIndex = new Map();
+    for (const m of opened.messages ?? []) {
+      const k = `${m.channelId}:${m.logTime}`;
+      const arr = seqIndex.get(k);
+      if (arr) arr.push(m.data);
+      else seqIndex.set(k, [m.data]);
+    }
   }
-  return undefined;
+  return seqIndex.get(key)?.[occurrence];
 }
 
 function decoderFor(topic: string) {
@@ -142,6 +206,14 @@ function pick(obj: unknown, path: string): number {
   return typeof cur === "number" ? cur : NaN;
 }
 
+/** Interactive "get" requests in flight; background work (series, prefetch) yields to them. */
+let activeGets = 0;
+const nextTask = () => new Promise<void>((r) => setTimeout(r, 0));
+async function yieldToInteractive() {
+  await nextTask(); // let queued onmessage events start
+  while (activeGets > 0) await new Promise<void>((r) => setTimeout(r, 4));
+}
+
 async function series(topic: string, path: string, maxPoints = 20000) {
   const t = topicData(topic);
   const d = decoderFor(topic);
@@ -158,9 +230,11 @@ async function series(topic: string, path: string, maxPoints = 20000) {
         outV.push(NaN);
       }
       outT.push(t.log[i++]);
+      if (i % 64 === 0) await yieldToInteractive();
     }
   } else {
     for (let i = 0; i < n; i += step) {
+      await yieldToInteractive();
       const m = await getMessage(topic, i);
       outT.push(t.log[i]);
       outV.push(pick(m.msg, path));
@@ -175,7 +249,9 @@ async function runPrefetch() {
   if (prefetching) return;
   prefetching = true;
   while (prefetchQueue.length) {
-    const p = prefetchQueue.shift()!;
+    await yieldToInteractive();
+    const p = prefetchQueue.shift();
+    if (!p) break;
     try {
       await getMessage(p.topic, p.index, p.render);
     } catch {
@@ -192,6 +268,10 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
       case "open": {
         cache.clear();
         decoders.clear();
+        rawByKey.clear();
+        loadedRanges.length = 0;
+        rawBytes = 0;
+        seqIndex = undefined;
         const file = req.file;
         const readable = new BlobReadable(file);
         const res = await analyzeRecording(
@@ -209,7 +289,13 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
         break;
       }
       case "get": {
-        const message = await getMessage(req.topic, req.index, req.render);
+        activeGets++;
+        let message;
+        try {
+          message = await getMessage(req.topic, req.index, req.render);
+        } finally {
+          activeGets--;
+        }
         const transfer: Transferable[] = [];
         let msgOut = message;
         if (message.bitmap) {
