@@ -8,7 +8,7 @@ import JSZip from "jszip";
 import { readFileSync } from "node:fs";
 
 async function openDemo(page: Page) {
-  await page.goto("/");
+  await page.goto("/?features=all"); // exercise the views hidden in the first delivery too
   await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true })));
   await page.reload();
   await page.getByTestId("demo").click();
@@ -114,7 +114,7 @@ test.describe("compact mode on a phone", () => {
 });
 
 test("English interface (language switch)", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?features=all");
   await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true, lang: "en" })));
   await page.reload();
   await expect(page.getByText("Project for the dotLumen SW Test Challenge")).toBeVisible();
@@ -140,4 +140,21 @@ test("English is the default language", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "StampTrace" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open the demo recording" })).toBeVisible();
+});
+
+test("first delivery: Requirements, Safety and Bugs & notes are hidden", async ({ page }) => {
+  await page.goto("/?features=default");
+  await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true })));
+  await page.reload();
+  await page.getByTestId("demo").click();
+  await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
+  const tabs = await page.getByRole("tab").allInnerTexts();
+  expect(tabs.map((t) => t.trim())).toEqual(["Replay", "Inventory", "Causality & latency", "Content quality", "FOV consistency"]);
+  await expect(page.getByRole("button", { name: "Bug", exact: true })).toHaveCount(0);
+  await expect(page.getByText("requirement violation")).toHaveCount(0);
+  // a deep link to a hidden view falls back to the replay
+  await page.goto("/?features=default#?view=requirements");
+  await page.reload();
+  await page.getByTestId("demo").click();
+  await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
 });

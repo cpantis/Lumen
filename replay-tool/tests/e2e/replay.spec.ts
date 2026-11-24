@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 
 async function openDemo(page: Page, theme: "dark" | "light" = "dark") {
-  await page.goto("/");
+  await page.goto("/?features=all"); // exercise the views hidden in the first delivery too
   await page.evaluate((t) => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true, theme: t })), theme);
   await page.reload();
   await page.getByTestId("demo").click();

@@ -7,6 +7,7 @@ import { evaluate, parseThresholds, type EffectiveRoles, type RequirementResult 
 import { firstAfter, lastAtOrBefore } from "../core/sync";
 import type { Analysis, Role, TopicData } from "../core/types";
 import { worker } from "../worker/client";
+import { viewEnabled } from "./features";
 import { announce, app, clock, toast, type AppState, type Note, type PanelConfig, uid } from "./store";
 import type { Layout } from "react-grid-layout";
 
@@ -235,7 +236,7 @@ export async function openFile(file: File): Promise<void> {
     if (url.panels?.length && url.panels.every((p) => analysis.topics.some((t) => t.topic === p.topic))) app.set({ panels: url.panels, layout: url.layout ?? [] });
     else if (saved.panels?.length) app.set({ panels: saved.panels, layout: saved.layout ?? [] });
     else app.set(defaultPanels(analysis, s));
-    if (url.view) app.set({ view: url.view as AppState["view"] });
+    if (url.view && viewEnabled(url.view as AppState["view"])) app.set({ view: url.view as AppState["view"] });
     // start at the first output message so the panels are not empty on open
     const firstOut = Math.min(...analysis.topics.filter((t) => effectiveRole(t, app.get()) === "output" && t.count).map((t) => t.log[0]));
     const startT = url.t !== undefined && Number.isFinite(url.t) ? url.t : Number.isFinite(firstOut) ? firstOut : 0;

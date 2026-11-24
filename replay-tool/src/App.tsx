@@ -1,6 +1,7 @@
 /** Root component: routes between start / loading / error and the analysis shell. */
 import { Fragment, lazy, Suspense, useEffect } from "react";
 import { useLang } from "./i18n";
+import { viewEnabled } from "./state/features";
 import { prefs } from "./state/actions";
 import { app, useApp } from "./state/store";
 import { BugEditor } from "./views/bugs";
@@ -30,7 +31,9 @@ function ViewFallback() {
 }
 
 function Views() {
-  const view = useApp((s) => s.view);
+  const requested = useApp((s) => s.view);
+  // views hidden in this delivery (see state/features.ts) fall back to the replay
+  const view = viewEnabled(requested) ? requested : "replay";
   switch (view) {
     case "inventory":
       return <InventoryView />;

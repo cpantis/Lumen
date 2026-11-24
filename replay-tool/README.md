@@ -152,6 +152,14 @@ Defectele injectate, pe care testele verifică faptul că aplicația le găseșt
 
 Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←/→` cu ±1 s, `[ ]` schimbă viteza, `A/B` pun cursoarele, `L` pornește bucla, `N` adaugă o notă, `I` deschide inspectorul, `Ctrl/⌘+K` paleta de comenzi, `1–8` comută vederile, `?` deschide ajutorul.
 
+## Livrare în etape (feature flags)
+
+Prima livrare include Replay și vederile de analiză: Inventory, Causality & latency, Content quality, FOV consistency. Vederile **Requirements & tests**, **Safety** și **Bugs & notes** (cu butoanele Bug/notă, hașurile de încălcare de pe timeline și badge-ul FAIL) sunt implementate și testate, dar ascunse.
+
+- Pentru a le livra: `true` în `DEFAULT_FEATURES` din `src/state/features.ts`.
+- Pentru a le vedea intern, fără release: deschide aplicația cu `?features=all` (reținut în browser); `?features=default` revine.
+- Evaluarea cerințelor rămâne disponibilă din linia de comandă: `npm run metrics -- fișier.mcap`.
+
 ## Interfață, performanță, confidențialitate
 
 - **Limbă:** engleză (implicit) sau română, din Setări. Analiza, rapoartele, exporturile și CLI-ul sunt în engleză; varianta română a interfeței folosește `src/i18n` (textele generate de analiză rămân în engleză).

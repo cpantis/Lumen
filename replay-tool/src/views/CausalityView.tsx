@@ -3,6 +3,7 @@
  * latency distribution per input→output pair (p50/p90/p95/p99/max, histogram, over
  * time), dropped input frames, A/B measurement tool, and the requirements draft.
  */
+import { features } from "../state/features";
 import { Copy, Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { layoutDiagram, mermaidDiagram } from "../core/diagram";
@@ -126,9 +127,11 @@ function RequirementsDraft() {
         <button className="btn sm" onClick={() => download("thresholds-propus.yaml", dumpThresholds(proposed), "text/yaml")}>
           <Download size={14} /> YAML
         </button>
-        <button className="btn sm primary" onClick={() => { setThresholdsText(dumpThresholds(proposed)); toast("The proposed derived thresholds were applied"); }}>
-          {tr("Aplică pragurile propuse")}
-        </button>
+        {features.requirements && (
+          <button className="btn sm primary" onClick={() => { setThresholdsText(dumpThresholds(proposed)); toast("The proposed derived thresholds were applied"); }}>
+            {tr("Aplică pragurile propuse")}
+          </button>
+        )}
       </div>
     </>
   );

@@ -14,6 +14,7 @@ import { useDecoded } from "../panels/useMessage";
 import { AUTHOR, fmt, Kv, Logo, Modal } from "./primitives";
 import { APP_VERSION, GIT_COMMIT } from "../state/trace";
 import { openBugDraft, openNoteDraft } from "../views/bugs";
+import { features, visibleViews } from "../state/features";
 import { tr } from "../i18n";
 
 export function applyTheme(theme: "dark" | "light", highContrast: boolean): void {
@@ -70,8 +71,8 @@ export function Nav() {
   const T = useT();
   const view = useApp((s) => s.view);
   const s = useApp((st) => st);
-  const fails = results(s.profile, s).filter((r) => r.verdict === "FAIL").length;
-  const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues"];
+  const fails = features.requirements ? results(s.profile, s).filter((r) => r.verdict === "FAIL").length : 0;
+  const views = visibleViews();
   return (
     <nav className="nav" role="tablist" aria-label={tr("Vederi")} data-tour="nav">
       {views.map((v) => (
@@ -144,14 +145,18 @@ export function CommandPalette() {
   const cmds = useMemo<Cmd[]>(() => {
     const a = s.analysis;
     const list: Cmd[] = [];
-    const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues", "styleguide"];
+    const views: ViewName[] = [...visibleViews(), "styleguide"];
     for (const v of views) list.push({ group: "view", label: v === "styleguide" ? "Styleguide (design system)" : T.views[v as keyof typeof T.views], run: () => app.set({ view: v }) });
     list.push(
       { group: "action", label: "Play / pause", run: togglePlay },
       { group: "action", label: T.exportPng, run: downloadSnapshot },
       { group: "action", label: T.exportVideo, run: () => exportVideo() },
-      { group: "action", label: T.createBug, run: () => openBugDraft() },
-      { group: "action", label: T.addNote, run: openNoteDraft },
+      ...(features.issues
+        ? [
+            { group: "action", label: T.createBug, run: () => openBugDraft() },
+            { group: "action", label: T.addNote, run: openNoteDraft },
+          ]
+        : []),
       { group: "action", label: "Derived profile", run: () => app.set({ profile: "derived" }) },
       { group: "action", label: "Strict profile", run: () => app.set({ profile: "strict" }) },
       { group: "action", label: T.tour, run: () => app.set({ tourStep: 0 }) },
@@ -159,7 +164,7 @@ export function CommandPalette() {
     );
     if (a) {
       for (const t of a.topics) list.push({ group: "topic", label: `${t.topic} · ${t.type}`, run: () => { app.set({ view: "inventory" }); } });
-      for (const r of results(s.profile, s)) for (const v of r.violations.slice(0, 20)) list.push({ group: "failure", label: `${r.id} @ ${fmt.s(v.startNs)} · ${v.topic} · ${v.message}`, run: () => jumpTo(v.startNs, [v.topic]) });
+      if (features.requirements) for (const r of results(s.profile, s)) for (const v of r.violations.slice(0, 20)) list.push({ group: "failure", label: `${r.id} @ ${fmt.s(v.startNs)} · ${v.topic} · ${v.message}`, run: () => jumpTo(v.startNs, [v.topic]) });
       for (const rep of s.reports) for (const f of rep.failures.slice(0, 50)) list.push({ group: "report", label: `${f.requirement} @ ${fmt.s(f.startNs)} · ${f.message}`, run: () => jumpTo(f.startNs, [f.topic]) });
       for (const b of s.bugs) list.push({ group: "bug", label: b.title, run: () => jumpTo(b.startNs, b.topics) });
     }
@@ -224,12 +229,12 @@ export function HelpModal() {
     ["Shift + ← / →", "±1 second"],
     ["[ / ]", "slower / faster"],
     ["Home / End", "start / end"],
-    ["A / B", "set cursors A / B (measurement, loop, video export, bug)"],
+    ["A / B", features.issues ? "set cursors A / B (measurement, loop, video export, bug)" : "set cursors A / B (measurement, loop, video export)"],
     ["L", "loop over A–B"],
-    ["N", "note at the current moment"],
+    ...(features.issues ? ([["N", "note at the current moment"]] as Array<[string, string]>) : []),
     ["I", "inspector"],
     ["Ctrl/⌘ + K", "command palette: topic, timestamp (e.g. 12.5s), failure, command"],
-    ["1 … 8", "switch views"],
+    [`1 … ${visibleViews().length}`, "switch views"],
     ["?", "this help"],
   ];
   return (
@@ -280,10 +285,10 @@ export function SettingsModal() {
 
 const TOUR: Array<{ sel: string; title: string; text: string }> = [
   { sel: "[data-tour=file]", title: "The analysed file", text: "Name, duration and SHA-256 fingerprint — included in every export so results can be reproduced exactly." },
-  { sel: "[data-tour=nav]", title: "The views", text: "Replay, then one view per sub-challenge: inventory (2.1), causality (2.2), consistency (2.3), requirements (2.4), safety (2.5), bugs and notes (2.6–2.7)." },
+  { sel: "[data-tour=nav]", title: "The views", text: features.requirements ? "Replay, then one view per sub-challenge: inventory (2.1), causality (2.2), consistency (2.3), requirements (2.4), safety (2.5), bugs and notes (2.6–2.7)." : "Replay, then the analysis views: inventory (2.1), causality & latency (2.2), content quality and FOV consistency (2.3)." },
   { sel: "[data-tour=transport]", title: "Synchronised playback", text: "Play, frame-by-frame stepping on a topic, speeds, time source (log or header.stamp), A/B cursors." },
   { sel: "[data-tour=panels]", title: "Inputs | Outputs FOV 1 | Outputs FOV 2", text: "Each panel shows the message at the current moment, its age and its status (OK / late / stale / empty / invalid)." },
-  { sel: "[data-tour=timeline]", title: "Timeline", text: "Every message is a tick; gaps are red, requirement violations shaded, report failures marked with ▲. Click to jump." },
+  { sel: "[data-tour=timeline]", title: "Timeline", text: features.requirements ? "Every message is a tick; gaps are red, requirement violations shaded, report failures marked with ▲. Click to jump." : "Every message is a tick; gaps are red, empty or invalid messages are highlighted. Click to jump." },
 ];
 
 export function Tour() {
@@ -345,7 +350,7 @@ export function useShortcuts(): void {
       const tgt = e.target as HTMLElement;
       if (tgt.closest("input, textarea, select, [contenteditable=true], .modal")) return;
       if (s.phase !== "ready") return;
-      const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues"];
+      const views = visibleViews();
       switch (e.key) {
         case " ":
           if (tgt.tagName === "BUTTON") return;
@@ -388,7 +393,7 @@ export function useShortcuts(): void {
           break;
         case "n":
         case "N":
-          openNoteDraft();
+          if (features.issues) openNoteDraft();
           break;
         case "i":
         case "I":
@@ -398,7 +403,7 @@ export function useShortcuts(): void {
           app.set({ helpOpen: true });
           break;
         default:
-          if (/^[1-8]$/.test(e.key)) app.set({ view: views[+e.key - 1] });
+          if (/^[1-9]$/.test(e.key) && views[+e.key - 1]) app.set({ view: views[+e.key - 1] });
       }
     };
     window.addEventListener("keydown", onKey);

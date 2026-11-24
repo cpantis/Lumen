@@ -8,8 +8,7 @@ For sub-challenge 2.8 I built **StampTrace** (“Synchronised replay & test anal
 The interface is organised around the component, in three columns (*Inputs | Outputs FOV 1 | Outputs FOV 2*), with a timeline in which:
 - every message is a tick;
 - gaps are highlighted in red;
-- requirement violations are shaded;
-- failures from test reports appear as markers.
+- empty or invalid messages are highlighted.
 
 Each panel shows the age and the status of its message (OK, late, stale, empty, invalid). An input panel can show exactly the frame the current output was produced from, and the live latency is also translated into centimetres walked by the user.
 
@@ -24,11 +23,7 @@ What the application shows and what the automatic tests report therefore come fr
 The tool directly supports the analysis of the component:
 - **2.1** — the inventory and the regularity plots export to Markdown/CSV, ready to paste into the document;
 - **2.2** — the I/O diagram is inferred, not assumed: a topic is an output only if it copies the stamps of an input exactly and is published after it. Hardware-synchronised non-visual sensors (e.g. an IMU stamped on the camera clock) are not accepted as evidence;
-- **2.3** — the 3D cloud ↔ depth consistency is computed over time, and missing calibration parameters are estimated (Nelder–Mead), with a confidence per parameter;
-- **2.4** — the *Derived* and *Strict* profiles are compared requirement by requirement;
-- **2.5** — every latency and gap is expressed as the distance walked “blind” at the walking speed estimated from the IMU;
-- **2.6** — bugs are created in one click, with snapshots, measured values and steps to reproduce (deep link and CLI command);
-- **2.7** — notes and questions for the developer are anchored in time, next to an automatically maintained assumptions register.
+- **2.3** — the 3D cloud ↔ depth consistency is computed over time, and missing calibration parameters are estimated (Nelder–Mead), with a confidence per parameter.
 
 Every export carries the SHA-256 of the file, the application version and the thresholds used, so results can be reproduced exactly.
 
