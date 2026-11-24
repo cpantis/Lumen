@@ -4,7 +4,7 @@
  * timeline, and the side inspector.
  */
 import { LayoutGrid, Plus, Save, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import GridLayout, { WidthProvider, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -27,7 +27,8 @@ function LatencyStrip() {
   const source = useApp((s) => s.timeSource);
   const exact = a.edges.filter((e) => e.kind === "exact" && /Image|CompressedImage/.test(a.topics.find((t) => t.topic === e.input)?.type ?? ""));
   const [sel, setSel] = useState(0);
-  const [open, setOpen] = useState(true);
+  const narrow = useNarrow();
+  const [open, setOpen] = useState(!narrow);
   const cursor = useClock();
   const e = exact[Math.min(sel, exact.length - 1)];
   const ot = e && a.topics.find((t) => t.topic === e.output)!;
@@ -129,31 +130,85 @@ function AddPanelMenu() {
 function LayoutMenu() {
   const T = useT();
   const [, force] = useState(0);
+  const [saving, setSaving] = useState(false);
   const names = Object.keys(savedLayouts());
+  const [name, setName] = useState("");
   return (
-    <div className="row">
+    <div className="row" style={{ position: "relative" }}>
       <button className="btn sm ghost" data-tip={T.layoutReset} aria-label={T.layoutReset} onClick={() => app.set(defaultPanels(app.get().analysis!))}>
         <RotateCcw size={14} />
       </button>
-      <button
-        className="btn sm ghost"
-        data-tip={T.layoutSave}
-        aria-label={T.layoutSave}
-        onClick={() => {
-          const n = prompt("Numele layout-ului:", `layout ${names.length + 1}`);
-          if (n) {
-            saveLayout(n);
-            force((x) => x + 1);
-          }
-        }}
-      >
+      <button className="btn sm ghost" data-tip={T.layoutSave} aria-label={T.layoutSave} aria-expanded={saving} onClick={() => { setName(`layout ${names.length + 1}`); setSaving(!saving); }}>
         <Save size={14} />
       </button>
+      {saving && (
+        <form
+          className="card row"
+          style={{ position: "absolute", right: 0, top: 34, zIndex: 30, boxShadow: "var(--shadow)", padding: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            saveLayout(name.trim());
+            setSaving(false);
+            force((x) => x + 1);
+          }}
+          onKeyDown={(e) => e.key === "Escape" && setSaving(false)}
+        >
+          <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label="Numele layout-ului" style={{ width: 180 }} />
+          <button className="btn sm primary">{T.layoutSave}</button>
+        </form>
+      )}
       {names.length > 0 && (
         <select className="input" style={{ minHeight: 28 }} aria-label={T.layoutLoad} value="" onChange={(e) => e.target.value && loadLayout(e.target.value)}>
           <option value="">{T.layoutLoad}…</option>
           {names.map((n) => <option key={n}>{n}</option>)}
         </select>
+      )}
+    </div>
+  );
+}
+
+/** True on tablets / phones (≤ 900 px): the replay switches to one panel at a time. */
+export function useNarrow(): boolean {
+  const q = "(max-width: 900px)";
+  const [narrow, setNarrow] = useState(() => typeof matchMedia !== "undefined" && matchMedia(q).matches);
+  useEffect(() => {
+    const m = matchMedia(q);
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
+/** Compact mode (tablet / phone): one panel at a time + selector. */
+function CompactPanels() {
+  const T = useT();
+  const s = useApp((st) => st);
+  const a = s.analysis!;
+  const [i, setI] = useState(0);
+  const k = Math.min(i, Math.max(0, s.panels.length - 1));
+  const p = s.panels[k];
+  return (
+    <div className="col" style={{ gap: 8, padding: 8 }}>
+      <div className="row wrap">
+        <button className="btn sm icon" aria-label="Panoul anterior" disabled={k === 0} onClick={() => setI(k - 1)}>‹</button>
+        <select className="input" style={{ flex: 1, minWidth: 0 }} aria-label="Panoul afișat" value={k} onChange={(e) => setI(+e.target.value)}>
+          {s.panels.map((x, j) => (
+            <option key={x.id} value={j}>
+              {j + 1}/{s.panels.length} · {x.kind === "auto" ? x.topic : `${x.kind}: ${x.topic}`}
+            </option>
+          ))}
+        </select>
+        <button className="btn sm icon" aria-label="Panoul următor" disabled={k >= s.panels.length - 1} onClick={() => setI(k + 1)}>›</button>
+        <AddPanelMenu />
+      </div>
+      {p ? (
+        <div style={{ height: "52vh", minHeight: 260 }}>
+          <PanelFor cfg={p} topics={a.topics} />
+        </div>
+      ) : (
+        <div className="panel-empty" style={{ position: "static", height: 200 }}>Niciun panou. {T.addPanel}.</div>
       )}
     </div>
   );
@@ -165,6 +220,20 @@ export function ReplayView() {
   const a = s.analysis!;
   const fovs = fovList(a, s);
   const nIn = a.topics.filter((t) => effectiveRole(t, s) === "input").length;
+  const narrow = useNarrow();
+  if (narrow)
+    return (
+      <div className="replay narrow" id="main-content">
+        <div>
+          <Transport />
+          <LatencyStrip />
+        </div>
+        <div className="replay-grid" data-tour="panels">
+          <CompactPanels />
+        </div>
+        <Timeline />
+      </div>
+    );
   return (
     <div className="replay" id="main-content">
       <div>

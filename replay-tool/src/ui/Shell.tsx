@@ -12,7 +12,7 @@ import { downloadSnapshot, exportVideo } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
 import { fmt, Kv, Logo, Modal } from "./primitives";
-import { openBugDraft, openNoteDraft } from "../views/IssuesView";
+import { openBugDraft, openNoteDraft } from "../views/bugs";
 
 export function applyTheme(theme: "dark" | "light", highContrast: boolean): void {
   document.documentElement.dataset.theme = theme;
@@ -32,7 +32,7 @@ export function TopBar() {
       <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label=".lumen Replay — acasă">
         <Logo height={22} />
       </button>
-      <span className="small" style={{ opacity: 0.75 }}>Replay</span>
+      <span className="small hide-narrow" style={{ opacity: 0.75 }}>Replay</span>
       <div className="file" data-tour="file">
         {a && (
           <>
@@ -43,9 +43,9 @@ export function TopBar() {
       <button className="btn sm ghost" onClick={() => app.set({ paletteOpen: true })} aria-label={T.commandPalette} data-tip={`${T.commandPalette} (Ctrl/⌘ + K)`}>
         <Search size={16} /> <kbd style={{ background: "transparent", color: "inherit" }}>⌘K</kbd>
       </button>
-      <button className="btn icon ghost" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
-      <button className="btn icon ghost" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
-      <button className="btn icon ghost" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
+      <button className="btn icon ghost hide-narrow" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
       <button
         className="btn icon ghost"
         onClick={() => {

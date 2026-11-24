@@ -5,7 +5,7 @@ import { fmtUtcNs, parseTimeInput } from "../core/time";
 import { useT } from "../i18n";
 import { seek, setPlaying, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, useClock } from "../state/store";
-import { openBugDraft, openNoteDraft } from "../views/IssuesView";
+import { openBugDraft, openNoteDraft } from "../views/bugs";
 
 export function Transport() {
   const T = useT();

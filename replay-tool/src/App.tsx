@@ -1,20 +1,32 @@
 /** Root component: routes between start / loading / error and the analysis shell. */
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { prefs } from "./state/actions";
 import { app, useApp } from "./state/store";
-import { BugEditor } from "./views/IssuesView";
-import { CausalityView } from "./views/CausalityView";
-import { ConsistencyView } from "./views/ConsistencyView";
-import { InventoryView } from "./views/InventoryView";
-import { IssuesView } from "./views/IssuesView";
-import { QualityView } from "./views/QualityView";
-import { ReplayView } from "./views/ReplayView";
-import { RequirementsView } from "./views/RequirementsView";
-import { SafetyView } from "./views/SafetyView";
+import { BugEditor } from "./views/bugs";
 import { ErrorScreen, LoadingScreen, StartScreen } from "./views/StartScreen";
-import { StyleguideView } from "./views/StyleguideView";
 import { CommandPalette, HelpModal, Inspector, LiveRegion, Nav, SettingsModal, Toast, TopBar, Tour, useShortcuts } from "./ui/Shell";
 import { TooltipLayer, Logo } from "./ui/primitives";
+
+// Views are code-split: the start screen loads fast, three.js / uPlot / analysis views on demand.
+const named = <K extends string>(p: Promise<Record<K, React.ComponentType>>, k: K) => p.then((m) => ({ default: m[k] }));
+const ReplayView = lazy(() => named(import("./views/ReplayView"), "ReplayView"));
+const InventoryView = lazy(() => named(import("./views/InventoryView"), "InventoryView"));
+const CausalityView = lazy(() => named(import("./views/CausalityView"), "CausalityView"));
+const QualityView = lazy(() => named(import("./views/QualityView"), "QualityView"));
+const ConsistencyView = lazy(() => named(import("./views/ConsistencyView"), "ConsistencyView"));
+const RequirementsView = lazy(() => named(import("./views/RequirementsView"), "RequirementsView"));
+const SafetyView = lazy(() => named(import("./views/SafetyView"), "SafetyView"));
+const IssuesView = lazy(() => named(import("./views/IssuesView"), "IssuesView"));
+const StyleguideView = lazy(() => named(import("./views/StyleguideView"), "StyleguideView"));
+
+function ViewFallback() {
+  return (
+    <div className="view" aria-busy="true">
+      <div className="skeleton" style={{ height: 40, width: 320, marginBottom: 16 }} />
+      <div className="skeleton" style={{ height: 240 }} />
+    </div>
+  );
+}
 
 function Views() {
   const view = useApp((s) => s.view);
@@ -40,6 +52,14 @@ function Views() {
   }
 }
 
+function LazyViews() {
+  return (
+    <Suspense fallback={<ViewFallback />}>
+      <Views />
+    </Suspense>
+  );
+}
+
 export function App() {
   const phase = useApp((s) => s.phase);
   const view = useApp((s) => s.view);
@@ -55,7 +75,7 @@ export function App() {
     return (
       <div className="app" style={{ gridTemplateRows: "56px 1fr" }}>
         <header className="topbar"><Logo height={22} /><span className="spacer" /><button className="btn sm" onClick={() => { app.set({ view: "replay" }); history.replaceState(null, "", location.pathname); }}>Înapoi</button></header>
-        <main className="main"><StyleguideView /></main>
+        <main className="main"><Suspense fallback={<ViewFallback />}><StyleguideView /></Suspense></main>
         <TooltipLayer />
       </div>
     );
@@ -70,7 +90,7 @@ export function App() {
           <TopBar />
           <Nav />
           <main className="main">
-            <Views />
+            <LazyViews />
             <Inspector />
           </main>
         </div>

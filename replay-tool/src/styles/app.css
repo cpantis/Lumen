@@ -516,7 +516,19 @@ input[type="checkbox"] {
   min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
+}
+/* tablet / phone: one scrolling column (transport, panel, timeline) */
+.replay.narrow {
+  display: block;
+  overflow-y: auto;
+}
+.replay.narrow .replay-grid {
+  overflow: visible;
+}
+.replay.narrow .timeline-scroll {
+  max-height: none;
 }
 .replay-grid {
   overflow: auto;
@@ -975,6 +987,42 @@ table.t tr[aria-selected="true"] td {
 }
 
 @media (max-width: 900px) {
+  .topbar .file {
+    display: none;
+  }
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .topbar .file,
+  .topbar .hide-narrow {
+    display: none;
+  }
+  .topbar {
+    gap: var(--space-1);
+    padding: 0 var(--space-2);
+  }
+  .time-display {
+    min-width: 0;
+  }
+  .time-display .abs {
+    display: none;
+  }
+  .view-title h2 {
+    font-size: var(--text-xl);
+  }
+}
+@media (max-width: 900px) {
+  .transport {
+    gap: 6px;
+  }
+  .timeline-scroll {
+    max-height: 26vh;
+  }
+  .legend {
+    display: none;
+  }
   .inspector {
     position: fixed;
     right: 0;
