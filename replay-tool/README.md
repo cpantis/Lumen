@@ -34,6 +34,18 @@ Cu Docker:
 docker build -t lumen-replay . && docker run --rm -p 8080:80 lumen-replay
 ```
 
+## Publicare pe Vercel
+
+Aplicația e un site static: fișierele `.mcap` sunt procesate doar în browserul utilizatorului și nu sunt trimise către server. Configurația e în `vercel.json` (Vite, `npm ci`, `npm run build`, ieșire `dist/`, cache pentru resurse, antete de securitate, `noindex`).
+
+1. Pe vercel.com: **Add New → Project → Import** repository-ul de pe GitHub.
+2. **Root Directory:** `replay-tool` (proiectul e într-un subfolder al repository-ului).
+3. Restul setărilor vin din `vercel.json`, deci **Deploy** e suficient. Nu sunt necesare variabile de mediu: commit-ul afișat în aplicație vine automat din `VERCEL_GIT_COMMIT_SHA`.
+4. Vercel creează un deploy de *preview* pentru fiecare branch. Deploy-ul de *production* vine din branch-ul de producție (implicit `main`); se poate schimba în Settings → Git.
+5. Recomandat: **Settings → Deployment Protection** → Vercel Authentication sau parolă, ca aplicația să fie văzută doar de cei cărora le trimiți linkul.
+
+Alternativ, din linia de comandă: `npx vercel` (preview) sau `npx vercel --prod`, rulat din `replay-tool/`.
+
 ## Arhitectură
 
 ```mermaid

@@ -10,7 +10,7 @@ import { TOOL_ID } from "../state/trace";
 function Footer() {
   return (
     <footer className="footer">
-      <span>© .lumen · Pedestrian Autonomous Driving AI</span>
+      <span>Proiect pentru dotLumen SW Test Challenge — nu este un produs oficial .lumen</span>
       <span>{TOOL_ID}</span>
       <span>Rulează 100 % local — fișierul nu e trimis nicăieri</span>
       <span>Accesibil: tastatură, cititor de ecran, contrast ridicat</span>
