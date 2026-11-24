@@ -3,7 +3,7 @@
  * (for the hover read-out, in the image's own units).
  *
  * Supported encodings: rgb8, rgba8, bgr8, bgra8, mono8, mono16, 8UC1, 8UC3, 16UC1,
- * 16SC1, 32FC1 (+ yuv422/uyvy as a best effort). Depth-like encodings are
+ * 16SC1, 32FC1, bayer_*8 (raw luminance) and yuv422/uyvy/yuyv (luma only). Depth-like encodings are
  * colour-mapped between a configurable min/max.
  */
 
@@ -37,6 +37,10 @@ export function encodingInfo(enc: string): { channels: number; bytes: number; fl
       return { channels: 4, bytes: 1 };
     case "mono8":
     case "8uc1":
+    case "bayer_rggb8":
+    case "bayer_bggr8":
+    case "bayer_gbrg8":
+    case "bayer_grbg8":
       return { channels: 1, bytes: 1 };
     case "mono16":
     case "16uc1":
@@ -205,7 +209,8 @@ export function imageToRgba(img: RosImage, opts: { colormap?: Colormap; range?: 
         out[o] = d[i + 2];
         out[o + 1] = d[i + 1];
         out[o + 2] = d[i];
-      } else if (e === "mono8" || e === "8uc1") {
+      } else if (e === "mono8" || e === "8uc1" || e.startsWith("bayer_")) {
+        // Bayer mosaics are shown as raw luminance (no demosaicing — documented limitation)
         const v = d[row + x];
         out[o] = out[o + 1] = out[o + 2] = v;
       } else {

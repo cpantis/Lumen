@@ -20,7 +20,8 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 |---|---|
 | `npm run dev` | server de dezvoltare (generează `public/demo.mcap`) |
 | `npm run build` | site static în `dist/` (typecheck + Vite) |
-| `npm test` | 36 de teste unitare și de integrare (Vitest) |
+| `npm test` | 49 de teste unitare, de integrare și de compatibilitate (Vitest) |
+| `npm run conformance` | cele 416 fișiere oficiale de conformitate MCAP |
 | `npm run test:e2e` | 7 teste Playwright, inclusiv audit de accesibilitate axe-core în ambele teme |
 | `npm run test:all` | typecheck + unit + build + e2e |
 | `npm run inspect -- fișier.mcap [--schemas]` | inspectează o înregistrare reală: topicuri, tipuri, scheme, statistici, cauzalitate |
@@ -81,6 +82,27 @@ flowchart LR
 | **2.7** | Note și întrebări ancorate în timp, cu tag și prioritate, exportate ca listă ordonată. Un registru de presupuneri se actualizează automat cu tot ce a presupus aplicația. |
 
 **Trasabilitate.** Orice export include SHA-256 al fișierului, versiunea aplicației (git commit), profilul și hash-ul pragurilor, calibrările și viteza folosită. Calculele sunt deterministe: nu se eșantionează mesaje, ci doar pixeli în interiorul unui mesaj, după o sub-grilă fixă, documentată.
+
+## Compatibilitate cu alte înregistrări
+
+Verificată față de specificația MCAP și de registrul de encodinguri, citite din sursa oficială (`foxglove/mcap`, `website/docs/spec`), și față de definițiile schemelor Foxglove din pachetul oficial `foxglove-schemas-protobuf`.
+
+| Ce | Cum e verificat | Rezultat |
+|---|---|---|
+| **Toate variantele structurale MCAP**: cu sau fără chunk-uri, index de chunk-uri, index de mesaje, statistici, rezumat, canale și scheme repetate, padding, atașamente, metadate | cele **416 fișiere oficiale de conformitate** (`fixtures/conformance`, `npm run conformance`), comparate mesaj cu mesaj cu rezultatul așteptat | 416/416 |
+| ROS 2 (`cdr` + `ros2msg`), compresie zstd / lz4 / fără chunk-uri | fișiere scrise cu `mcap-ros2-support` (`fixtures/realworld`) | ✓ |
+| ROS 1 (`ros1` + `ros1msg`, CameraInfo cu `K`/`D` majuscule) | `mcap-ros1-support` | ✓ |
+| Scheme Foxglove (RawImage, CompressedImage, PointCloud, FrameTransform(s), CameraCalibration, LaserScan, PoseInFrame) în **protobuf** și **JSON** (octeți base64) | `mcap-protobuf-support` + `foxglove-schemas-protobuf` | ✓, normalizate la tipurile ROS |
+| `cbor`, `msgpack` (fără schemă), `cdr` + `omgidl`, `cdr` + `ros2idl` (cu tipul rădăcină aflat altundeva decât pe prima poziție) | writer-ul `mcap` de bază | ✓ |
+| `flatbuffer`, `capnproto` | — | apar în inventar, marcate explicit „nu pot decoda”, fără să oprească analiza |
+| Fișier trunchiat | primele 60 % dintr-o înregistrare | partea lizibilă e folosită, cu avertisment |
+| Chunk corupt (CRC greșit) | octeți inversați într-un chunk | chunk-ul e omis și raportat, cu interval; restul e recuperat; axa timpului rămâne cea reală |
+| Fișier care nu e MCAP (rosbag2 `.db3`, rosbag ROS 1, pointer Git LFS) | — | eroare clară, cu comanda de conversie |
+
+Probleme găsite și corectate în urma acestor verificări:
+1. Fișierele indexate fără Message Index, sau fără canale repetate în rezumat, nu erau citite. Acum se trece automat la citire secvențială, iar numărul de mesaje e comparat cu Statistics.
+2. Senzorii sincronizați hardware (IMU cu stamp-uri identice cu camera) făceau camera să pară „ieșire produsă din IMU”. Senzorii non-vizuali și sursele din care ieșirea folosește < 20 % din cadre nu mai sunt acceptate ca dovadă de cauzalitate.
+3. Un chunk corupt era decodat ca date valide, producând timpi absurzi. Acum se face verificare CRC per chunk.
 
 ## Înregistrarea sintetică (date de test cu defecte cunoscute)
 

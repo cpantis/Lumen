@@ -8,10 +8,10 @@
  * FOV groups and the motion estimate are derived. Deterministic: no sampling of
  * messages (only per-pixel sub-sampling inside a message, documented in content.ts).
  */
-import { McapIndexedReader, McapStreamReader, type McapTypes } from "@mcap/core";
+import { McapIndexedReader, McapRecordBuilder, McapStreamReader, type McapTypes } from "@mcap/core";
 import { inferCausality } from "./causality";
 import { contentMetrics, DEFAULT_RANGES, type PlausibleRanges } from "./content";
-import { decompressHandlers, hasHeader, makeDecoder, rootDefinition, shortType, type ChannelInfo, type Decoder, type SchemaInfo } from "./decode";
+import { decompressHandlers, makeDecoder, rootDefinition, shortType, type ChannelInfo, type Decoder, type SchemaInfo } from "./decode";
 import { estimateMotion } from "./motion";
 import { sha256Of } from "./sha256";
 import { detectGaps, rateStats, summarize } from "./stats";
@@ -47,10 +47,25 @@ export interface OpenedRecording {
 
 export type Progress = (phase: string, fraction: number) => void;
 
+const MAGIC = [0x89, 0x4d, 0x43, 0x41, 0x50, 0x30, 0x0d, 0x0a]; // "\x89MCAP0\r\n"
+
+/** Clear error for files that are not MCAP (ROS 1 bag, rosbag2 SQLite, LFS pointer…). */
+async function assertMcap(src: RecordingSource): Promise<void> {
+  if (src.size < 8) throw new Error("Fișierul e prea mic pentru a fi MCAP (sub 8 octeți).");
+  const head = await src.readSlice(0, Math.min(src.size, 64));
+  if (MAGIC.every((b, i) => head[i] === b)) return;
+  const text = new TextDecoder().decode(head);
+  if (text.startsWith("#ROSBAG")) throw new Error("Fișierul e un rosbag ROS 1 (.bag), nu MCAP. Convertește-l cu: mcap convert fișier.bag fișier.mcap");
+  if (text.startsWith("SQLite format 3")) throw new Error("Fișierul e un rosbag2 SQLite (.db3), nu MCAP. Convertește-l cu: ros2 bag convert (storage_id: mcap) sau mcap convert fișier.db3 fișier.mcap");
+  if (text.startsWith("version https://git-lfs")) throw new Error("Fișierul e un pointer Git LFS, nu înregistrarea propriu-zisă. Descarcă fișierul real (git lfs pull).");
+  throw new Error("Fișierul nu începe cu semnătura MCAP (\\x89MCAP0\\r\\n): nu e un fișier MCAP valid.");
+}
+
 /** Opens a recording: indexed reader when possible, sequential fallback otherwise. */
-export async function openRecording(src: RecordingSource, onProgress?: Progress): Promise<OpenedRecording> {
+export async function openRecording(src: RecordingSource, onProgress?: Progress, forceSequential = false): Promise<OpenedRecording> {
+  await assertMcap(src);
   const warnings: string[] = [];
-  try {
+  if (!forceSequential) try {
     const reader = await McapIndexedReader.Initialize({ readable: src.readable, decompressHandlers });
     const channels = new Map<number, ChannelInfo>();
     for (const [id, c] of reader.channelsById) channels.set(id, { id, topic: c.topic, messageEncoding: c.messageEncoding, schemaId: c.schemaId, metadata: c.metadata });
@@ -65,14 +80,19 @@ export async function openRecording(src: RecordingSource, onProgress?: Progress)
       }
     }
     if (reader.chunkIndexes.length === 0) throw new Error("fără chunk index");
+    // Index usable only if every non-empty chunk has message indexes (Message Index records are
+    // optional in MCAP) and the summary repeats the Channel records (otherwise channels live only
+    // inside chunks, which the indexed reader does not see).
+    if (reader.chunkIndexes.some((ci) => ci.messageIndexOffsets.size === 0 && ci.messageEndTime !== 0n)) throw new Error("chunk-uri fără Message Index");
+    if (channels.size === 0) throw new Error("rezumatul nu conține înregistrările Channel");
     return { indexed: true, reader, channels, schemas, startNs: start ?? 0n, endNs: end ?? 0n, warnings };
   } catch (err) {
     warnings.push(
-      `Fișierul nu are index utilizabil (${err instanceof Error ? err.message : String(err)}). Se citește secvențial (McapStreamReader); fișierul poate fi trunchiat.`,
+      `Index MCAP inutilizabil (${err instanceof Error ? err.message : String(err)}): fișierul se citește secvențial, integral. Funcționează, dar e mai lent și ține mesajele în memorie.`,
     );
   }
   // Sequential fallback
-  const stream = new McapStreamReader({ decompressHandlers, validateCrcs: false });
+  const stream = new McapStreamReader({ decompressHandlers, validateCrcs: true });
   const channels = new Map<number, ChannelInfo>();
   const schemas = new Map<number, SchemaInfo>();
   const messages: RawMessage[] = [];
@@ -93,6 +113,51 @@ export async function openRecording(src: RecordingSource, onProgress?: Progress)
   messages.sort((a, b) => (a.logTime < b.logTime ? -1 : a.logTime > b.logTime ? 1 : 0));
   const startNs = messages.length ? messages[0].logTime : 0n;
   const endNs = messages.length ? messages[messages.length - 1].logTime : 0n;
+  return { indexed: false, channels, schemas, messages, startNs, endNs, warnings };
+}
+
+/**
+ * Salvage mode for an indexed file with damaged chunks: every chunk is read and
+ * CRC-checked on its own; damaged chunks are skipped (and reported), the rest is kept.
+ */
+export async function openSalvage(src: RecordingSource, reader: McapIndexedReader, onProgress?: Progress): Promise<OpenedRecording> {
+  const channels = new Map<number, ChannelInfo>();
+  const schemas = new Map<number, SchemaInfo>();
+  for (const [id, c] of reader.channelsById) channels.set(id, { id, topic: c.topic, messageEncoding: c.messageEncoding, schemaId: c.schemaId, metadata: c.metadata });
+  for (const [id, sc] of reader.schemasById) schemas.set(id, { id, name: sc.name, encoding: sc.encoding, data: sc.data });
+  const messages: RawMessage[] = [];
+  const bad: string[] = [];
+  const cis = [...reader.chunkIndexes].sort((a, b) => (a.chunkStartOffset < b.chunkStartOffset ? -1 : 1));
+  for (let k = 0; k < cis.length; k++) {
+    const ci = cis[k];
+    const start = Number(ci.chunkStartOffset);
+    const local: RawMessage[] = [];
+    try {
+      const stream = new McapStreamReader({ decompressHandlers, validateCrcs: true, noMagicPrefix: true });
+      // pre-seed every known Schema/Channel (from the summary or earlier chunks), since a
+      // channel may have been defined only inside a damaged chunk
+      const seed = new McapRecordBuilder();
+      for (const sc of schemas.values()) seed.writeSchema(sc);
+      for (const c of channels.values()) seed.writeChannel({ id: c.id, topic: c.topic, messageEncoding: c.messageEncoding, schemaId: c.schemaId, metadata: c.metadata ?? new Map() });
+      stream.append(seed.buffer);
+      stream.append(await src.readSlice(start, start + Number(ci.chunkLength)));
+      for (let rec; (rec = stream.nextRecord()); ) {
+        if (rec.type === "Schema") schemas.set(rec.id, { id: rec.id, name: rec.name, encoding: rec.encoding, data: rec.data });
+        else if (rec.type === "Channel") channels.set(rec.id, { id: rec.id, topic: rec.topic, messageEncoding: rec.messageEncoding, schemaId: rec.schemaId, metadata: rec.metadata });
+        else if (rec.type === "Message") local.push({ channelId: rec.channelId, logTime: rec.logTime, data: rec.data.slice() });
+      }
+      messages.push(...local);
+    } catch (err) {
+      bad.push(`chunk #${k + 1} @${start} (${(Number(ci.messageStartTime - reader.chunkIndexes[0].messageStartTime) / 1e9).toFixed(2)} s – ${(Number(ci.messageEndTime - reader.chunkIndexes[0].messageStartTime) / 1e9).toFixed(2)} s): ${err instanceof Error ? err.message : String(err)}`);
+    }
+    onProgress?.("recuperare chunk-uri", (k + 1) / cis.length);
+  }
+  messages.sort((a, b) => (a.logTime < b.logTime ? -1 : a.logTime > b.logTime ? 1 : 0));
+  const warnings = bad.length ? [`${bad.length} din ${cis.length} chunk-uri sunt deteriorate și au fost omise (date lipsă în intervalele lor): ${bad.join("; ")}`] : [];
+  // keep the recording's real time span (from the index) so times stay comparable with other tools
+  const st = reader.statistics;
+  const startNs = st && st.messageCount > 0n ? st.messageStartTime : cis.reduce((m, c) => (c.messageStartTime < m ? c.messageStartTime : m), cis[0]?.messageStartTime ?? 0n);
+  const endNs = st && st.messageCount > 0n ? st.messageEndTime : cis.reduce((m, c) => (c.messageEndTime > m ? c.messageEndTime : m), 0n);
   return { indexed: false, channels, schemas, messages, startNs, endNs, warnings };
 }
 
@@ -230,7 +295,7 @@ export async function analyzeRecording(
       ch,
       schema,
       decoder: makeDecoder(ch, schema),
-      header: hasHeader(schema),
+      header: false,
       log: [],
       stamp: [],
       size: [],
@@ -241,9 +306,16 @@ export async function analyzeRecording(
   }
 
   let k = 0;
+  let total = 0;
+  let unknownChannel = 0;
+  try {
   for await (const m of iterateAll(rec)) {
     const a = accs.get(m.channelId);
-    if (!a) continue;
+    if (!a) {
+      unknownChannel++;
+      continue;
+    }
+    total++;
     a.log.push(Number(m.logTime - start));
     a.size.push(m.data.length);
     let msg: any;
@@ -264,6 +336,24 @@ export async function analyzeRecording(
     a.samples.push(contentMetrics(a.schema?.name ?? "", msg, ranges));
     if (++k % 500 === 0) progress("analiză mesaje", Math.min(1, Number(m.logTime - start) / span));
   }
+  } catch (err) {
+    // A corrupt chunk / inconsistent index during indexed reading: redo everything sequentially.
+    if (rec.indexed && rec.reader) {
+      const again = await openSalvage(src, rec.reader, progress);
+      again.warnings.unshift(`Citirea indexată a eșuat (${err instanceof Error ? err.message : String(err)}); fiecare chunk a fost verificat separat (CRC).`);
+      return analyzeRecording(src, { ...opts, hash: false, opened: again }).then((r) => ({ ...r, analysis: { ...r.analysis, sha256: sha } }));
+    }
+    rec.warnings.push(`Citirea s-a oprit: ${err instanceof Error ? err.message : String(err)}.`);
+  }
+  // Messages outside chunks or channels missing from the summary are invisible to the index:
+  // compare with the Statistics record and fall back to a sequential pass when they disagree.
+  const statCount = rec.reader?.statistics?.messageCount;
+  if (rec.indexed && (unknownChannel > 0 || (statCount !== undefined && statCount > 0n && BigInt(total + unknownChannel) !== statCount))) {
+    const again = await openRecording(src, progress, true);
+    again.warnings.unshift(`Indexul nu acoperă toate mesajele (statistici: ${statCount ?? "?"}, găsite prin index: ${total}, canal necunoscut: ${unknownChannel}); s-a citit secvențial.`);
+    return analyzeRecording(src, { ...opts, hash: false, opened: again }).then((r) => ({ ...r, analysis: { ...r.analysis, sha256: sha } }));
+  }
+  if (unknownChannel) rec.warnings.push(`${unknownChannel} mesaje referă un canal fără înregistrare Channel și au fost ignorate.`);
   progress("analiză mesaje", 1);
 
   const topics: TopicData[] = [];
@@ -292,7 +382,8 @@ export async function analyzeRecording(
       content.hash[i] = s.hash;
     });
     const type = shortType(a.schema?.name ?? "(fără schemă)");
-    const header = a.header && stamp.some((v) => Number.isFinite(v));
+    // header detected from the data (works for every encoding, incl. Foxglove "timestamp")
+    const header = stamp.some((v) => Number.isFinite(v));
     const rate = rateStats(log);
     const sizeSorted = Array.from(size).sort((x, y) => x - y);
     const details = { ...(a.details ?? {}) };

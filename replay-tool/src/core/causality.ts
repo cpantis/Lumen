@@ -24,6 +24,26 @@ const SENSOR_TYPES = new Set([
 
 const IMAGE_TYPES = new Set(["sensor_msgs/Image", "sensor_msgs/CompressedImage"]);
 
+/** Raw sensor types that are acquired, never computed from another topic's frames. */
+const ACQUIRED_TYPES = new Set(["sensor_msgs/Image", "sensor_msgs/CompressedImage", "sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix"]);
+/** High-rate non-visual sensors: stamp coincidence with them proves nothing (hardware sync). */
+const NON_VISUAL = new Set(["sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix", "sensor_msgs/FluidPressure", "sensor_msgs/Temperature", "tf2_msgs/TFMessage"]);
+/** An output must consume at least this fraction of its source's frames (rate ratio ≥ 1/5). */
+export const MAX_SOURCE_DROP = 0.8;
+
+/**
+ * Plausibility of "output is computed from input", beyond identical stamps:
+ * hardware-synchronised sensors share stamps (a 100 Hz IMU and a 10 Hz camera stamped on
+ * the same clock), so identical stamps alone are not proof. Rejected:
+ *  - sources that are high-rate non-visual sensors (IMU, GNSS, TF…) for acquired types;
+ *  - pairs where the output uses < 20 % of the source's frames (rate ratio < 1/5).
+ */
+export function plausibleSource(e: CausalEdge, inputType: string, outputType: string): boolean {
+  if (e.dropRatio > MAX_SOURCE_DROP) return false;
+  if (NON_VISUAL.has(inputType) && (ACQUIRED_TYPES.has(outputType) || IMAGE_TYPES.has(outputType))) return false;
+  return true;
+}
+
 /** Minimum median delay for a topic to count as *processed* from another (ns). */
 export const MIN_PROCESSING_NS = 2e6;
 
@@ -142,14 +162,18 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
   // published clearly later (> MIN_PROCESSING_NS, i.e. it was *processed*; a
   // CameraInfo published 0.2 ms after its image is a companion, not a product).
   // Pick, for each output, the earliest source in the chain.
-  const processed = raw.filter((e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && topics.find((t) => t.topic === e.output)?.type !== "sensor_msgs/CameraInfo");
+  const typeOf = (n: string) => topics.find((t) => t.topic === n)?.type ?? "";
+  const processed = raw.filter(
+    (e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && typeOf(e.output) !== "sensor_msgs/CameraInfo" && plausibleSource(e, typeOf(e.input), typeOf(e.output)),
+  );
   const derived = new Set(processed.map((e) => e.output));
   for (const t of topics) {
     const srcs = processed.filter((e) => e.output === t.topic && !derived.has(e.input));
     if (srcs.length) {
       const isImg = (n: string) => (IMAGE_TYPES.has(topics.find((x) => x.topic === n)?.type ?? "") ? 1 : 0);
       // prefer: highest match rate, then image sources (the data the component processes), then namespace
-      const best = srcs.sort((a, b) => b.matchRate - a.matchRate || isImg(b.input) - isImg(a.input) || nsAffinity(b.input, t.topic) - nsAffinity(a.input, t.topic))[0];
+      const lead = (e: CausalEdge) => summarize(e.latencyFromLog).p50; // larger = source published earlier
+      const best = srcs.sort((a, b) => b.matchRate - a.matchRate || isImg(b.input) - isImg(a.input) || Math.round((lead(b) - lead(a)) / 1e5) || nsAffinity(b.input, t.topic) - nsAffinity(a.input, t.topic))[0];
       prior.set(t.topic, {
         role: "output",
         reason: `${(best.matchRate * 100).toFixed(0)}% din header.stamp-uri copiază ${best.input}, publicat cu mediana ${(summarize(best.latencyFromLog).p50 / 1e6).toFixed(1)} ms după intrare`,
@@ -171,7 +195,7 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
       // Only exact-stamp edges are proof. Temporal proximity (e.g. a 200 Hz IMU is always
       // "near" any output) proves nothing, so it is never added automatically.
       const e = raw.find((r) => r.input === i.topic && r.output === o.topic);
-      if (e) edges.push(e);
+      if (e && plausibleSource(e, i.type, o.type)) edges.push(e);
     }
   }
 
