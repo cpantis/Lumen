@@ -14,7 +14,8 @@ export const EN: Record<string, string> = {
     "Check that the file is an MCAP recording (ROS 2). Truncated files are read sequentially; if the error persists, run",
   "pentru detalii.": "for details.",
   "Sari la conținut": "Skip to content",
-  ".lumen Replay — acasă": ".lumen Replay — home",
+  "StampTrace — acasă": "StampTrace — home",
+  "creat de": "by",
   "Vederi": "Views",
   "Inspector": "Inspector",
   "Inspector mesaj": "Message inspector",
@@ -353,8 +354,8 @@ export const EN: Record<string, string> = {
   "Note și întrebări": "Notes and questions",
   "Cerințe critice pentru siguranță — profil": "Safety-critical requirements — profile",
   // styleguide
-  "Design system .lumen": ".lumen design system",
-  "Tokenuri, tipografie, componente — derivate din dotlumen.com și din logo": "Tokens, typography, components — derived from dotlumen.com and the logo",
+  "Design system StampTrace": "StampTrace design system",
+  "Tokenuri, tipografie, componente — inspirate de identitatea vizuală .lumen": "Tokens, typography, components — inspired by the .lumen visual identity",
   "Culori (tema curentă)": "Colours (current theme)",
   "Intrări = gri puncte · FOV 1 = mentă · FOV 2 = albastru. Culorile de stare se folosesc doar pentru stare, mereu cu iconiță + text.":
     "Inputs = dot grey · FOV 1 = mint · FOV 2 = blue. Status colours are used for status only, always with icon + text.",

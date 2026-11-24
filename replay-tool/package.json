@@ -1,8 +1,8 @@
 {
-  "name": "lumen-replay",
+  "name": "stamptrace",
   "private": true,
   "version": "1.0.0",
-  "description": ".lumen Replay — replay sincronizat pentru înregistrări ROS 2 MCAP ale Ochelarilor .lumen",
+  "description": "StampTrace — synchronised replay & test analysis for MCAP recordings",
   "type": "module",
   "scripts": {
     "predev": "tsx scripts/gen-synthetic.ts public/demo.mcap",
@@ -62,5 +62,6 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "author": "Calin Pantis"
 }

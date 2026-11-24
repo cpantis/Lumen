@@ -1,8 +1,10 @@
-# .lumen Replay
+# StampTrace
+
+**Synchronised replay & test analysis for MCAP recordings** · autor: **Calin Pantis**
 
 Aplicație web de **replay sincronizat** pentru înregistrările ROS 2 (MCAP) ale Ochelarilor .lumen. Răspunde la sub-challenge-ul 2.8 din *dotLumen SW Test Challenge v4* și este, în același timp, instrumentul de analiză pentru 2.1–2.7: orice afirmație din document poate fi dovedită cu o măsurătoare din aplicație.
 
-![Replay — temă închisă](docs/screenshots/replay-dark.png)
+![StampTrace — temă închisă](docs/screenshots/replay-dark.png)
 
 ## Pornire rapidă
 
@@ -31,7 +33,7 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 Cu Docker:
 
 ```bash
-docker build -t lumen-replay . && docker run --rm -p 8080:80 lumen-replay
+docker build -t stamptrace . && docker run --rm -p 8080:80 stamptrace
 ```
 
 ## Publicare pe Vercel
@@ -177,3 +179,7 @@ Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←
 | ![](docs/screenshots/requirements-dark.png) | ![](docs/screenshots/safety-dark.png) |
 
 Paragraful pentru secțiunea „Implementation” a documentului challenge-ului se află în [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+## Autor
+
+**Calin Pantis** — proiectat și dezvoltat pentru *dotLumen SW Test Challenge v4* (sub-challenge 2.8 și instrumentele de analiză pentru 2.1–2.7). StampTrace nu este un produs oficial .lumen; stilul vizual este inspirat de identitatea .lumen.

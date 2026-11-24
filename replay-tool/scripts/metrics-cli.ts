@@ -26,7 +26,7 @@ if (!file) {
 }
 const outDir = opt("--out", "out");
 const cfg = parseThresholds(readFileSync(opt("--thresholds", "config/thresholds.yaml"), "utf8"));
-const TOOL = `lumen-replay-cli ${process.env.npm_package_version ?? "1.0.0"}`;
+const TOOL = `StampTrace CLI ${process.env.npm_package_version ?? "1.0.0"} by Calin Pantis`;
 
 const { analysis } = await analyzeRecording(nodeSource(file), { ranges: cfg.plausible_ranges });
 mkdirSync(outDir, { recursive: true });

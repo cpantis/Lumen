@@ -190,7 +190,7 @@ async function main() {
         ? { compression: "lz4", compressedData: Uint8Array.from((lz4 as { compress: (d: Uint8Array) => ArrayLike<number> }).compress(data)) }
         : { compression: "zstd", compressedData: new Uint8Array(nodeZstd.zstdCompressSync!(data, { params: { [nodeZstd.constants.ZSTD_c_compressionLevel]: 12 } })) },
   });
-  await writer.start({ profile: "ros2", library: "lumen-replay synthetic generator" });
+  await writer.start({ profile: "ros2", library: "StampTrace synthetic generator" });
 
   const writers = new Map<string, MessageWriter>();
   const schemaIds = new Map<string, number>();

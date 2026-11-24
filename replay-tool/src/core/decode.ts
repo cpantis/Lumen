@@ -108,7 +108,7 @@ function rawDecoder(channel: ChannelInfo, schema: SchemaInfo | undefined): Decod
       return (data) => msgpackDecode(data);
     case "flatbuffer":
     case "capnproto":
-      throw new Error(`The "${enc}" encoding is not supported by .lumen Replay (it needs code generated from the schema); the topic appears in the inventory, but its messages cannot be decoded.`);
+      throw new Error(`The "${enc}" encoding is not supported by StampTrace (it needs code generated from the schema); the topic appears in the inventory, but its messages cannot be decoded.`);
     default:
       throw new Error(`Unknown message encoding: "${enc}"`);
   }

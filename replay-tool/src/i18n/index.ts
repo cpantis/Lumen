@@ -6,8 +6,8 @@ import { useSyncExternalStore } from "react";
 import { EN } from "./en";
 
 const ro = {
-  appTitle: "Replay — Ochelari .lumen",
-  tagline: "Pedestrian AI · replay sincronizat al intrărilor și ieșirilor componentei",
+  appTitle: "StampTrace",
+  tagline: "Replay sincronizat și analiză de test pentru înregistrări MCAP",
   startLead: "Încarcă o înregistrare ROS 2 (MCAP) și vezi, în orice moment, ce a intrat în componentă și ce a ieșit din ea — cu dovezi măsurate.",
   dropTitle: "Trage aici fișierul .mcap",
   dropSub: "sau apasă pentru a-l alege. Fișierul nu părăsește calculatorul tău: totul rulează local, în browser.",
@@ -74,8 +74,8 @@ const ro = {
 type Dict = typeof ro;
 
 const en: Dict = {
-  appTitle: "Replay — .lumen Glasses",
-  tagline: "Pedestrian AI · synchronised replay of the component's inputs and outputs",
+  appTitle: "StampTrace",
+  tagline: "Synchronised replay & test analysis for MCAP recordings",
   startLead: "Load a ROS 2 recording (MCAP) and see, at any moment, what went into the component and what came out — backed by measurements.",
   dropTitle: "Drop the .mcap file here",
   dropSub: "or click to choose it. The file never leaves your computer: everything runs locally, in the browser.",

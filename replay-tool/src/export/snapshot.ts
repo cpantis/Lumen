@@ -39,7 +39,7 @@ export async function downloadSnapshot(): Promise<void> {
   const png = await snapshotPng();
   if (!png) return;
   const blob = await (await fetch(png)).blob();
-  download(`lumen-replay-${(clock.get().t / 1e9).toFixed(3)}s.png`, blob, "image/png");
+  download(`stamptrace-${(clock.get().t / 1e9).toFixed(3)}s.png`, blob, "image/png");
   toast("PNG snapshot saved");
 }
 
@@ -83,6 +83,6 @@ export async function exportVideo(fps = 10): Promise<void> {
   }
   mr.stop();
   await done;
-  download(`lumen-replay-${(lo / 1e9).toFixed(2)}-${(hi / 1e9).toFixed(2)}s.webm`, new Blob(chunks, { type: "video/webm" }), "video/webm");
+  download(`stamptrace-${(lo / 1e9).toFixed(2)}-${(hi / 1e9).toFixed(2)}s.webm`, new Blob(chunks, { type: "video/webm" }), "video/webm");
   toast("Video exported");
 }

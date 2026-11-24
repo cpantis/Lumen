@@ -4,15 +4,18 @@ import { useRef, useState } from "react";
 import { useT } from "../i18n";
 import { cancelLoading, openDemo, openFile, recentFiles } from "../state/actions";
 import { app, useApp } from "../state/store";
-import { BrailleLoader, Logo, fmt } from "../ui/primitives";
-import { TOOL_ID } from "../state/trace";
+import { AUTHOR, BrailleLoader, Logo, fmt } from "../ui/primitives";
+import { APP_VERSION, GIT_COMMIT } from "../state/trace";
 import { tr } from "../i18n";
 
 function Footer() {
   return (
     <footer className="footer">
+      <span>
+        <b>StampTrace</b> · {tr("creat de")} <b>{AUTHOR}</b> · © 2026
+      </span>
       <span>{tr("Proiect pentru dotLumen SW Test Challenge — nu este un produs oficial .lumen")}</span>
-      <span>{TOOL_ID}</span>
+      <span>v{APP_VERSION} ({GIT_COMMIT})</span>
       <span>{tr("Rulează 100 % local — fișierul nu e trimis nicăieri")}</span>
       <span>{tr("Accesibil: tastatură, cititor de ecran, contrast ridicat")}</span>
     </footer>
@@ -28,11 +31,12 @@ export function StartScreen() {
   return (
     <div className="start">
       <header className="topbar">
-        <Logo height={22} />
+        <Logo height={30} />
         <span className="spacer" />
       </header>
       <main className="start-hero" id="main-content">
         <h1>{T.appTitle}</h1>
+        <p className="tagline">{T.tagline}</p>
         <p className="lead">{T.startLead}</p>
         <div
           className={`dropzone${over ? " over" : ""}`}
@@ -98,7 +102,7 @@ export function LoadingScreen() {
   const file = useApp((s) => s.file);
   return (
     <div className="start">
-      <header className="topbar"><Logo height={22} /></header>
+      <header className="topbar"><Logo height={30} /></header>
       <main className="col" style={{ alignItems: "center", justifyContent: "center", gap: 20, padding: 32 }} id="main-content" aria-busy="true">
         <BrailleLoader label={T.analyzing} />
         <h2 style={{ fontWeight: 200 }}>{T.analyzing}</h2>
@@ -124,7 +128,7 @@ export function ErrorScreen() {
   const err = useApp((s) => s.error);
   return (
     <div className="start">
-      <header className="topbar"><Logo height={22} /></header>
+      <header className="topbar"><Logo height={30} /></header>
       <main className="start-hero" id="main-content" role="alert">
         <h2>{T.error}</h2>
         <div className="callout error">{err}</div>

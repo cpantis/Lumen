@@ -86,7 +86,7 @@ export function bugMarkdown(b: Bug): string {
 export function defaultSteps(b: Bug): string {
   const a = app.get().analysis!;
   return [
-    `1. Open the recording \`${a.fileName}\` (SHA-256 \`${a.sha256.slice(0, 16)}…\`) in .lumen Replay.`,
+    `1. Open the recording \`${a.fileName}\` (SHA-256 \`${a.sha256.slice(0, 16)}…\`) in StampTrace.`,
     `2. Direct link to the moment: ${deepLink(b.startNs)}`,
     `3. Or from the command line: \`npm run metrics -- ${a.fileName} --out out/\` and look for \`${b.requirement || "the requirement"}\` in \`out/report-strict.json\` at t ≈ ${(b.startNs / 1e9).toFixed(3)} s.`,
     `4. Observe the topics ${b.topics.join(", ")} in the interval ${fmt.s(b.startNs)} – ${fmt.s(b.endNs)}.`,

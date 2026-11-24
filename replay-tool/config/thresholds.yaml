@@ -1,4 +1,4 @@
-# .lumen Replay — single source of truth for requirement thresholds.
+# StampTrace — single source of truth for requirement thresholds.
 #
 # The same file is read by the web app (Requirements view, threshold lines on plots,
 # violation shading on the timeline) and by the CLI (`npm run metrics -- file.mcap`),

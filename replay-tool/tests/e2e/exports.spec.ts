@@ -24,7 +24,7 @@ test("PNG snapshot of the layout", async ({ page }) => {
   await openDemo(page);
   await page.waitForTimeout(1500);
   const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "PNG snapshot" }).click()]);
-  expect(d.suggestedFilename()).toMatch(/^lumen-replay-.*\.png$/);
+  expect(d.suggestedFilename()).toMatch(/^stamptrace-.*\.png$/);
   const b = await bytes(d);
   expect(b.subarray(1, 4).toString()).toBe("PNG");
   expect(b.length).toBeGreaterThan(20_000);
@@ -138,6 +138,6 @@ test("English is the default language", async ({ page }) => {
   await page.evaluate(() => localStorage.removeItem("lumen.prefs"));
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByRole("heading", { name: "Replay — .lumen Glasses" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "StampTrace" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open the demo recording" })).toBeVisible();
 });

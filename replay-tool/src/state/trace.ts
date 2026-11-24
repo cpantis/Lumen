@@ -4,16 +4,20 @@
  * exactly the same image or report.
  */
 import { app } from "./store";
+import { AUTHOR } from "../ui/primitives";
+
+export { AUTHOR };
 
 declare const __APP_VERSION__: string;
 declare const __GIT_COMMIT__: string;
 
 export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
 export const GIT_COMMIT = typeof __GIT_COMMIT__ !== "undefined" ? __GIT_COMMIT__ : "dev";
-export const TOOL_ID = `lumen-replay ${APP_VERSION} (${GIT_COMMIT})`;
+export const TOOL_ID = `StampTrace ${APP_VERSION} (${GIT_COMMIT}) by ${AUTHOR}`;
 
 export interface Trace {
   tool: string;
+  author: string;
   file: string;
   sha256: string;
   profile: string;
@@ -33,6 +37,7 @@ export function trace(): Trace {
   const s = app.get();
   return {
     tool: TOOL_ID,
+    author: AUTHOR,
     file: s.analysis?.fileName ?? "",
     sha256: s.analysis?.sha256 ?? "",
     profile: s.profile,

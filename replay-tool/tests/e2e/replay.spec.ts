@@ -107,7 +107,7 @@ test("bug report, notes, command palette, report import", async ({ page }) => {
 
 test("styleguide is reachable without a file", async ({ page }) => {
   await page.goto("/#/styleguide");
-  await expect(page.getByRole("heading", { name: ".lumen design system" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "StampTrace design system" })).toBeVisible();
 });
 
 for (const theme of ["dark", "light"] as const) {

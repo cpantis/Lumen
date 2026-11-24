@@ -11,7 +11,8 @@ import { app, clock, useApp, type ViewName } from "../state/store";
 import { downloadSnapshot, exportVideo } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
-import { fmt, Kv, Logo, Modal } from "./primitives";
+import { AUTHOR, fmt, Kv, Logo, Modal } from "./primitives";
+import { APP_VERSION, GIT_COMMIT } from "../state/trace";
 import { openBugDraft, openNoteDraft } from "../views/bugs";
 import { tr } from "../i18n";
 
@@ -30,14 +31,13 @@ export function TopBar() {
   return (
     <header className="topbar">
       <a href="#main-content" className="skip-link">{tr("Sari la conținut")}</a>
-      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label={tr(".lumen Replay — acasă")}>
-        <Logo height={22} />
+      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label={tr("StampTrace — acasă")}>
+        <Logo height={30} />
       </button>
-      <span className="small hide-narrow" style={{ opacity: 0.75 }}>Replay</span>
       <div className="file" data-tour="file">
         {a && (
           <>
-            <b className="mono">{a.fileName}</b> <span style={{ opacity: 0.7 }}>· {fmt.s(a.durationNs, 2)} · {a.topics.length} topicuri · SHA-256 {a.sha256.slice(0, 12)}…</span>
+            <b className="mono">{a.fileName}</b> <span style={{ opacity: 0.7 }}>· {fmt.s(a.durationNs, 2)} · {a.topics.length} {tr("topicuri")} · SHA-256 {a.sha256.slice(0, 12)}…</span>
           </>
         )}
       </div>
@@ -241,6 +241,10 @@ export function HelpModal() {
       <p className="small">{tr("Timeline: click/drag pentru salt, Ctrl+rotiță zoom, Shift+rotiță deplasare, dublu-click resetare. Panourile se mută din antet și se redimensionează din colț.")}</p>
       <p className="small">{tr("Pe un panou de intrare, selectorul „↔ ieșire” arată exact cadrul de intrare folosit de ieșirea curentă.")}</p>
       <button className="btn" onClick={() => app.set({ helpOpen: false, tourStep: 0 })}>{tr("Pornește turul ghidat")}</button>
+      <hr />
+      <p className="small muted">
+        <b>StampTrace</b> {APP_VERSION} ({GIT_COMMIT}) · {tr("creat de")} <b>{AUTHOR}</b> · {tr("Proiect pentru dotLumen SW Test Challenge — nu este un produs oficial .lumen")}
+      </p>
     </Modal>
   );
 }

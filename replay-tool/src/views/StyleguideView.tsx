@@ -15,8 +15,8 @@ export function StyleguideView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>{tr("Design system .lumen")}</h2>
-        <span className="sub">{tr("Tokenuri, tipografie, componente — derivate din dotlumen.com și din logo")}</span>
+        <h2>{tr("Design system StampTrace")}</h2>
+        <span className="sub">{tr("Tokenuri, tipografie, componente — inspirate de identitatea vizuală .lumen")}</span>
       </div>
       <section className="card" style={{ marginBottom: 16 }}>
         <h3>Logo</h3>
@@ -24,6 +24,7 @@ export function StyleguideView() {
           <div style={{ color: "var(--text)" }}><Logo height={40} /></div>
           <div style={{ background: "#fff", color: "#161619", padding: 16, borderRadius: 8 }}><Logo height={40} /></div>
           <div style={{ background: "#000", color: "#fff", padding: 16, borderRadius: 8 }}><Logo height={40} /></div>
+          <Logo height={40} mark />
           <BrailleLoader />
         </div>
       </section>
