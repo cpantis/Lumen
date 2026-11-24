@@ -135,6 +135,75 @@ Fonturile se încarcă din Google Fonts.
 - Export al unui interval ca video WebM (prin `MediaRecorder` pe canvas compus), opțional.
 - Export CSV pentru seriile reprezentate grafic.
 
+## Funcții pentru un Senior Test Engineer (legate de fiecare sub-challenge)
+
+Documentul challenge-ului cere ca **fiecare afirmație să fie susținută de o măsurătoare**: „We value curiosity, rigour and evidence”. Aplicația trebuie să fie instrumentul care produce acea dovadă, nu doar un player video. Pentru fiecare sub-challenge adaugă:
+
+### 2.1 – Înțelegerea înregistrării
+- **Raport de inventar exportabil** (Markdown și CSV), gata de lipit în document: topic, tip, encoding, rezoluție sau dimensiune, `frame_id`, unități, număr de mesaje, Hz mediu / median / min / max, jitter, cel mai mare gol, clasificare I/O și **motivul** clasificării.
+- Pentru fiecare topic:
+  - **histograma intervalelor dintre mesaje** și **graficul frecvenței instantanee în timp**, ca regularitatea să se vadă pe toată înregistrarea;
+  - o **miniatură reprezentativă** (imagine, nor de puncte sau grafic), pentru secțiunea „visual” din document.
+- **Analiza ceasurilor**, pentru fiecare topic:
+  - diferența `log_time − header.stamp` în timp;
+  - stamp-uri nemonotone, duplicate, ieșite din ordine sau din viitor;
+  - pentru topicurile fără `header`, se notează că lipsește.
+
+### 2.2 – Documentarea componentei
+- **Inferență automată a cauzalității I/O:** pentru fiecare ieșire se caută ce intrare are `header.stamp` identic sau cel mai apropiat anterior și cu ce rată de potrivire. Din asta se generează **diagrama I/O** (Mermaid sau SVG, exportabilă), cu procentul de potrivire pe fiecare săgeată. Așa se dovedește, nu doar se presupune, ce intrări produc ce ieșiri.
+- **Analiză de latență**, pentru fiecare pereche intrare → ieșire:
+  - histogramă, percentile p50 / p90 / p95 / p99 / max și latență în timp;
+  - definiția exactă a latenței afișată lângă grafic (de exemplu `log_time(ieșire) − header.stamp(intrare)`).
+- **Rata de procesare și pierderile:** câte cadre de intrare **nu au** ieșire corespunzătoare (cadre sărite), raportul dintre rata de ieșire și rata de intrare, și secvențele lungi de cadre sărite marcate pe timeline.
+- **Unealtă de măsurare cu cursoare A/B** pe timeline: Δt, număr de mesaje per topic și frecvență în interval. Rezultatul se poate copia ca text pentru document.
+- **Ciornă de cerințe:** din valorile măsurate, aplicația propune praguri (de exemplu „frecvența ieșirii FOV 1 ≥ p1 din măsurat”). Ciorna se exportă ca tabel cu ID unic (`REQ-xxx`), enunț, criteriu de acceptare și metodă de verificare. Ultima decizie aparține inginerului, aplicația doar propune.
+
+### 2.3 – Consistența ieșirilor între ele
+- Pentru fiecare FOV: **gruparea ieșirilor care descriu același moment** (același stamp), cu indicator vizual când una dintre ele lipsește.
+- **Metrici de concordanță** calculate pe fiecare cadru și reprezentate în timp: de exemplu, punctele 3D proiectate care cad în afara imaginii sau a măștii, diferența de adâncime între două reprezentări și procentul de acoperire.
+- **Estimarea informației lipsă** (intrinseci și extrinseci):
+  - câmpuri editabile cu **eroarea de reproiecție recalculată live**;
+  - posibilitatea de a rula o optimizare simplă (grid search sau Nelder–Mead) pe parametrii necunoscuți;
+  - **intervalul de încredere** al estimării afișat (sensibilitatea metricii la ±δ pe fiecare parametru);
+  - parametrii estimați exportați ca JSON, pentru a fi refolosiți în testele automate.
+
+### 2.4 – Testarea automată
+- **Două profiluri de praguri**, *Derivat* (din 2.2) și *Strict* (final). Se comută dintr-un click, iar pragurile se citesc din același fișier YAML/JSON pe care îl folosesc scripturile de test, ca să existe **o singură sursă de adevăr**.
+- **Linii de prag** desenate pe toate graficele. Intervalele care încalcă pragul sunt **hașurate pe timeline**, cu valoarea depășirii („+38 ms peste limită”).
+- **Metrici de conținut pe fiecare mesaj**, nu doar sosirea lui:
+  - procent NaN, Inf și zero, valori min / max / medie, puncte în afara intervalului plauzibil;
+  - mesaje goale, dimensiune neschimbată sau aberantă, cadre identice repetate (hash);
+  - toate reprezentate în timp și cumulate per topic.
+- **Comparație de rapoarte:** import al rapoartelor *Derivat* și *Strict* în paralel. Diferențele PASS → FAIL sunt evidențiate per cerință, cu salt la momentele în care eșuează.
+- **Validare încrucișată:** metricile calculate în aplicație trebuie să coincidă cu cele din scripturile de test, în limita unei toleranțe. Un ecran „Verificare consistență” le compară și semnalează diferențele.
+
+### 2.5 – Ce înseamnă pentru utilizator
+- **Context de mișcare:** viteza de mers a utilizatorului, estimată din IMU (numărare de pași sau integrare cu filtrare) sau, dacă nu se poate estima, presupusă la 1,4 m/s și editabilă. Presupunerea apare în UI.
+- **Traducerea timpului în metri, peste tot:** lângă orice latență sau gol se afișează și **distanța parcursă** de utilizator („latență 180 ms ≈ 25 cm parcurși”, „gol de 600 ms ≈ 84 cm fără informație”).
+- O vedere **„Siguranță”** care arată doar cerințele marcate *safety-critical* și cele mai grave momente din înregistrare, ordonate după distanța parcursă „orbește”.
+
+### 2.6 – Raportarea problemelor
+- Buton **„Creează bug”** la momentul curent sau pentru intervalul A/B. Generează un raport Markdown (format de bug tracker) cu:
+  - titlu, severitate (selectabilă, cu justificare), cerința afectată;
+  - intervalul exact în ns și secunde relative, valorile măsurate față de cele așteptate;
+  - **capturi PNG** și grafice atașate;
+  - **pași de reproducere**: deep-link în aplicație, plus comanda CLI a testului care reproduce eșecul.
+- Bug-urile salvate apar ca markere pe timeline și se exportă împreună (ZIP: Markdown + imagini).
+
+### 2.7 – Întrebări pentru dezvoltator
+- **Note și întrebări ancorate în timp**, cu tag-uri (`întrebare`, `presupunere`, `anomalie`) și prioritate. Se exportă ca listă ordonată, cu link la momentul din înregistrare.
+- Un **registru de presupuneri**, actualizat automat cu tot ce aplicația a presupus (viteza de mers, intrinseci estimate, praguri). Documentul cere explicit: „State your assumptions explicitly”.
+
+### Trasabilitate și reproductibilitate
+- Pe ecran și în orice export apar: **SHA-256 al fișierului MCAP**, versiunea aplicației (git commit), profilul de praguri și parametrii estimați folosiți. Oricine trebuie să poată reproduce exact aceeași imagine sau același raport.
+- Toate calculele sunt deterministe, fără eșantionare aleatoare. Dacă se face decimare pentru performanță, aceasta se indică vizibil, iar metricile se calculează mereu pe date complete.
+
+## Prioritizare (bugetul total al challenge-ului este de 10 ore, iar 2.8 este opțional)
+Construiește în ordinea de mai jos. Fiecare nivel trebuie să fie **complet funcțional și livrabil** înainte de a trece la următorul:
+- **P0 (MVP, ~2–3 h):** încărcare MCAP, inventar, timeline sincronizat cu play/scrub, panouri pentru imagini și nori de puncte, fallback generic, vârsta mesajelor, golurile, identitatea vizuală de bază.
+- **P1:** asocierea ieșire → intrare cu latența, import al raportului de teste cu markere, profilurile *Derivat* / *Strict* cu linii de prag, metricile de conținut, distanța parcursă, cursoarele A/B.
+- **P2:** overlay-urile de proiecție cu estimarea parametrilor, „Creează bug”, notele și registrul de presupuneri, comparația de rapoarte, exportul video, tur ghidat, i18n EN.
+
 ## Robustețe
 - Aplicația nu se blochează la mesaje corupte, scheme lipsă, encodinguri necunoscute sau topicuri fără `header`. Un astfel de mesaj apare ca „nu pot decoda” și se continuă cu restul.
 - Fișiere neindexate sau trunchiate: fallback pe citire secvențială (`McapStreamReader`) cu avertisment.
@@ -151,6 +220,6 @@ Fonturile se încarcă din Google Fonts.
 ## Mod de lucru
 0. Definește întâi **design system-ul** (tokenuri CSS, tipografie, butoane, panou, antet de panou, badge-uri de stare, logo SVG) într-o pagină `/styleguide`, ca să poată fi verificat vizual înainte de restul aplicației.
 1. Continuă cu un script de inspecție care listează topicurile, tipurile, schemele și statisticile din fișierul real, ca să confirmi ce trebuie suportat.
-2. Implementează incremental: reader + inventar → timeline + sincronizare → panouri de imagine → 3D → asociere ieșire → intrare și latență → suprapuneri → import de raport → export.
+2. Implementează incremental, pe nivelurile P0 → P1 → P2 de mai sus: reader + inventar → timeline + sincronizare → panouri de imagine → 3D → asociere ieșire → intrare și latență → import de raport și praguri → suprapuneri → bug-uri și export. Logica de calcul (frecvență, goluri, latență, metrici de conținut) stă într-un modul pur, fără UI, testat unitar și reutilizabil din CLI (`npm run metrics -- file.mcap --out metrics.json`), pentru validarea încrucișată cu scripturile de test.
 3. După fiecare etapă, rulează testele și verifică vizual în browser.
 4. Declară explicit orice presupunere făcută acolo unde datele nu spun ceva.

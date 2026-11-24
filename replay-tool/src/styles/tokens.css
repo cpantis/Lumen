@@ -1,0 +1,120 @@
+/*
+ * .lumen design tokens — derived from dotlumen.com and the logo in the challenge
+ * document (#161619 near-black, #B2B2B2 dot grey, mint #77E8CA, navy #00263D,
+ * blue #384AD3). Dark theme is the default (like the website).
+ */
+:root {
+  --font-sans: "Poppins", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-pill: 50px;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2.25rem;
+  --text-hero: clamp(2.25rem, 5vw, 4rem);
+
+  --dur: 160ms;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0e0e10;
+  --surface-2: #161619;
+  --surface-3: #1f1f23;
+  --border: #2a2a2e;
+  --border-strong: #3a3a40;
+  --text: #ffffff;
+  --text-muted: #a3a3a3; /* #8F8F8F from the site, lifted to keep ≥ 4.5:1 on --surface-2 */
+  --dot: #b2b2b2;
+  --accent: #77e8ca;
+  --accent-contrast: #000000;
+  --accent-2: #7f8cff; /* #384AD3 lightened for contrast on black */
+  --accent-2-strong: #384ad3;
+  --ok: #77e8ca;
+  --warn: #ffcb05;
+  --error: #ff5a60;
+  --ok-bg: rgba(119, 232, 202, 0.12);
+  --warn-bg: rgba(255, 203, 5, 0.12);
+  --error-bg: rgba(255, 90, 96, 0.14);
+  --role-input: var(--dot);
+  --role-fov1: var(--accent);
+  --role-fov2: var(--accent-2);
+  --role-unknown: #6b6b70;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f5f5f5;
+  --surface-2: #e8eaed;
+  --surface-3: #dcdfe3;
+  --border: #e3e3e3;
+  --border-strong: #c4c4c4;
+  --text: #161619;
+  --text-muted: #4f4f4f;
+  --dot: #6f6f6f; /* #979797 darkened for ≥ 3:1 graphics contrast */
+  --accent: #00263d;
+  --accent-contrast: #ffffff;
+  --accent-2: #384ad3;
+  --accent-2-strong: #384ad3;
+  --ok: #136150;
+  --warn: #7a5d00;
+  --error: #c8102e;
+  --ok-bg: rgba(30, 138, 110, 0.12);
+  --warn-bg: rgba(179, 138, 0, 0.14);
+  --error-bg: rgba(200, 16, 46, 0.1);
+  --role-input: #6f6f6f;
+  --role-fov1: #136150;
+  --role-fov2: #384ad3;
+  --role-unknown: #9a9a9a;
+  --overlay: rgba(22, 22, 25, 0.4);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* High-contrast mode (user setting): pure black/white, thicker borders. */
+:root[data-contrast="high"] {
+  --text-muted: var(--text);
+  --border: var(--text);
+  --border-strong: var(--text);
+}
+:root[data-contrast="high"][data-theme="dark"] {
+  --surface: #000;
+  --surface-2: #000;
+  --surface-3: #111;
+  --accent: #8ffff0;
+  --accent-2: #b3bcff;
+  --warn: #ffe14d;
+  --error: #ff8a8f;
+}
+:root[data-contrast="high"][data-theme="light"] {
+  --surface: #fff;
+  --surface-2: #fff;
+  --surface-3: #eee;
+  --accent: #000;
+  --accent-contrast: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 0ms;
+  }
+}

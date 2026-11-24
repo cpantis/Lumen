@@ -1,0 +1,178 @@
+# .lumen Replay — single source of truth for requirement thresholds.
+#
+# The same file is read by the web app (Requirements view, threshold lines on plots,
+# violation shading on the timeline) and by the CLI (`npm run metrics -- file.mcap`),
+# and is meant to be read by the automatic test scripts of sub-challenge 2.4.
+#
+# Profiles:
+#   derived — values derived from what the component does today (2.2)
+#   strict  — values the final product should meet, justified by user safety (2.5)
+#
+# Selectors pick topics using the *effective* classification (auto + user edits):
+#   role: input | output      fov: <fov name>      type: <regex>     topic: <regex>
+#
+# Placeholders: the derived values below are starting points; use
+# "Requirements → Regenerate derived from measurements" in the app to fit them to
+# the recording, then copy the exported YAML back here.
+
+version: 1
+gap_factor: 2 # gap = interval > gap_factor × median period
+plausible_ranges:
+  depthMin: 0.1 # m — closer than this is physically implausible for the cameras
+  depthMax: 40 # m — beyond this, stereo/learned depth is not trustworthy outdoors
+  accMax: 50 # m/s² — |a| above this is a sensor glitch for a walking person
+  gyroMax: 20 # rad/s
+assumptions:
+  walking_speed_mps: 1.4 # used when the IMU cannot provide an estimate
+  step_length_m: 0.7
+
+requirements:
+  - id: REQ-IN-01
+    title: Intrările de cameră sunt publicate la o frecvență constantă
+    kind: rate_min
+    select: { role: input, type: "Image|CompressedImage" }
+    safety: true
+    verification: Analiză automată — rata pe fereastră glisantă de 1 s, evaluată la fiecare mesaj
+    rationale: Fără cadre de intrare, componenta nu are ce procesa; orice scădere se propagă la ieșiri.
+    derived: { min_hz: 10, window_s: 1 }
+    strict: { min_hz: 15, window_s: 1 }
+
+  - id: REQ-OUT-01
+    title: Fiecare ieșire este publicată cu o frecvență minimă
+    kind: rate_min
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — rata pe fereastră glisantă de 1 s
+    rationale: La 1,4 m/s, fiecare 100 ms fără ieșire înseamnă 14 cm parcurși fără informație nouă.
+    derived: { min_hz: 5, window_s: 1 }
+    strict: { min_hz: 10, window_s: 1 }
+
+  - id: REQ-OUT-02
+    title: Niciun gol între două ieșiri consecutive nu depășește limita
+    kind: gap_max
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — intervalul dintre mesaje consecutive
+    rationale: Golul maxim este timpul în care utilizatorul merge "orb"; 300 ms ≈ 42 cm la 1,4 m/s.
+    derived: { max_ms: 500 }
+    strict: { max_ms: 200 }
+
+  - id: REQ-LAT-01
+    title: Latența cap-coadă (stamp intrare → publicare ieșire) este limitată
+    kind: latency
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — log_time(ieșire) − header.stamp(intrare potrivită exact)
+    rationale: Un obstacol e raportat din poziția de acum `latență` secunde; 150 ms ≈ 21 cm.
+    derived: { p95_ms: 250, max_ms: 400 }
+    strict: { p95_ms: 100, max_ms: 150 }
+
+  - id: REQ-TRACE-01
+    title: Fiecare ieșire poartă stamp-ul cadrului de intrare din care provine
+    kind: match_min
+    select: { role: output }
+    safety: false
+    verification: Analiză automată — potrivire exactă de header.stamp cu o intrare
+    rationale: Fără trasabilitate, latența și consistența nu pot fi verificate.
+    derived: { min_ratio: 0.95 }
+    strict: { min_ratio: 1.0 }
+
+  - id: REQ-DROP-01
+    title: Componenta nu sare cadre de intrare
+    kind: drop_max
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — cadre de intrare fără nicio ieșire cu același stamp
+    rationale: Secvențele lungi de cadre sărite sunt goluri de percepție.
+    derived: { max_ratio: 0.2, max_run: 5 }
+    strict: { max_ratio: 0.05, max_run: 2 }
+
+  - id: REQ-CONT-01
+    title: Ieșirile nu sunt goale
+    kind: empty_max
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — mesaje cu 0 puncte / 0 pixeli / payload gol
+    rationale: Un mesaj gol poate fi interpretat ca "drum liber".
+    derived: { max_ratio: 0.02 }
+    strict: { max_ratio: 0.0 }
+
+  - id: REQ-CONT-02
+    title: Mesajele sunt valide structural și decodabile
+    kind: invalid_max
+    select: {}
+    safety: true
+    verification: Analiză automată — decodare CDR + verificări de structură (lungime date, NaN în IMU)
+    rationale: Un mesaj corupt e la fel de periculos ca unul lipsă, dar mai greu de detectat.
+    derived: { max_ratio: 0.0 }
+    strict: { max_ratio: 0.0 }
+
+  - id: REQ-CONT-03
+    title: Proporția de valori NaN/Inf per mesaj de ieșire este limitată
+    kind: nan_max
+    select: { role: output }
+    safety: false
+    verification: Analiză automată — NaN/Inf per mesaj
+    rationale: NaN-urile reduc acoperirea; peste prag, zona nu mai poate fi considerată percepută.
+    derived: { max_ratio: 0.5 }
+    strict: { max_ratio: 0.2 }
+
+  - id: REQ-CONT-04
+    title: Acoperirea (valori valide) per mesaj de ieșire este suficientă
+    kind: valid_min
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — 1 − NaN − zero, per mesaj
+    rationale: Un mesaj cu 10% valori valide arată aproape nimic din scenă.
+    derived: { min_ratio: 0.3 }
+    strict: { min_ratio: 0.6 }
+
+  - id: REQ-CONT-05
+    title: Valorile sunt în intervale fizic plauzibile
+    kind: out_of_range_max
+    select: {}
+    safety: false
+    verification: Analiză automată — valori finite în afara plausible_ranges
+    rationale: Distanțe de 300 m sau accelerații de 200 m/s² indică erori de calcul sau de senzor.
+    derived: { max_ratio: 0.05 }
+    strict: { max_ratio: 0.01 }
+
+  - id: REQ-CONT-06
+    title: Ieșirile nu îngheață (cadre identice repetate)
+    kind: duplicate_max
+    select: { role: output }
+    safety: true
+    verification: Analiză automată — hash de conținut identic cu mesajul anterior
+    rationale: O ieșire înghețată pare validă, dar descrie o scenă veche.
+    derived: { max_ratio: 0.05, max_run: 3 }
+    strict: { max_ratio: 0.0, max_run: 1 }
+
+  - id: REQ-CLK-01
+    title: header.stamp este monoton crescător și nu vine din viitor
+    kind: stamp_monotonic
+    select: {}
+    safety: false
+    verification: Analiză automată — stamp[i] ≥ stamp[i−1] și stamp ≤ log_time
+    rationale: Stamp-urile greșite invalidează sincronizarea și măsurarea latenței.
+    derived: { allow_duplicates: true }
+    strict: { allow_duplicates: false }
+
+  - id: REQ-CLK-02
+    title: Întârzierea de transport a intrărilor (log_time − stamp) este limitată
+    kind: clock_offset_max
+    select: { role: input }
+    safety: false
+    verification: Analiză automată — percentila 95 a log_time − header.stamp
+    rationale: Contribuie direct la latența totală percepută de utilizator.
+    derived: { p95_ms: 100 }
+    strict: { p95_ms: 30 }
+
+  - id: REQ-FOV-01
+    title: Ieșirile aceluiași FOV descriu același moment și apar împreună
+    kind: fov_sync
+    select: {}
+    safety: false
+    verification: Analiză automată — grupare după stamp; toate ieșirile prezente, decalaj de publicare limitat
+    rationale: Ieșiri inconsistente în timp pot descrie scene diferite (2.3).
+    derived: { min_complete_ratio: 0.9, max_spread_ms: 50 }
+    strict: { min_complete_ratio: 0.99, max_spread_ms: 10 }
