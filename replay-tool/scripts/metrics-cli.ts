@@ -21,7 +21,7 @@ const opt = (name: string, def: string) => {
 };
 const file = args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
 if (!file) {
-  console.error("Utilizare: npm run metrics -- fișier.mcap [--out out/] [--thresholds config/thresholds.yaml]");
+  console.error("Usage: npm run metrics -- file.mcap [--out out/] [--thresholds config/thresholds.yaml]");
   process.exit(2);
 }
 const outDir = opt("--out", "out");
@@ -35,9 +35,9 @@ let failed = 0;
 for (const profile of ["derived", "strict"] as const) {
   const res = evaluate(analysis, cfg, profile);
   writeFileSync(join(outDir, `report-${profile}.json`), JSON.stringify(toReport(analysis, res, profile, TOOL), null, 2));
-  console.log(`\n== Profil ${profile} ==`);
-  for (const r of res) console.log(`${r.verdict.padEnd(4)} ${r.id.padEnd(13)} ${r.safety ? "[siguranță] " : ""}${r.title} — ${r.summary}`);
+  console.log(`\n== Profile ${profile} ==`);
+  for (const r of res) console.log(`${r.verdict.padEnd(4)} ${r.id.padEnd(13)} ${r.safety ? "[safety] " : ""}${r.title} — ${r.summary}`);
   if (profile === "derived") failed = res.filter((r) => r.verdict === "FAIL").length;
 }
-console.log(`\nsha256 ${analysis.sha256}\nRezultate scrise în ${outDir}/`);
+console.log(`\nsha256 ${analysis.sha256}\nResults written to ${outDir}/`);
 process.exit(failed ? 1 : 0);

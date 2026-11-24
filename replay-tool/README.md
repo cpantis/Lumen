@@ -22,7 +22,7 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 | `npm run build` | site static în `dist/` (typecheck + Vite) |
 | `npm test` | 49 de teste unitare, de integrare și de compatibilitate (Vitest) |
 | `npm run conformance` | cele 416 fișiere oficiale de conformitate MCAP |
-| `npm run test:e2e` | 15 teste Playwright: fluxurile principale, fiecare export (PNG, WebM, CSV, Markdown, raport JSON, ZIP de bug-uri), modul telefon, interfața EN și audit de accesibilitate axe-core în ambele teme |
+| `npm run test:e2e` | 16 teste Playwright: fluxurile principale, fiecare export (PNG, WebM, CSV, Markdown, raport JSON, ZIP de bug-uri), modul telefon, interfața EN și audit de accesibilitate axe-core în ambele teme |
 | `npm run test:all` | typecheck + unit + build + e2e |
 | `npm run inspect -- fișier.mcap [--schemas]` | inspectează o înregistrare reală: topicuri, tipuri, scheme, statistici, cauzalitate |
 | `npm run metrics -- fișier.mcap --out out/` | `metrics.json`, `report-derived.json`, `report-strict.json`; codul de ieșire e 1 dacă profilul derivat are eșecuri |
@@ -152,7 +152,7 @@ Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←
 
 ## Interfață, performanță, confidențialitate
 
-- **Limbă:** română (implicit) sau engleză, din Setări. Traducerile sunt în `src/i18n/en.ts`. Dovezile generate de analiză (motivele clasificării, mesajele de încălcare) rămân în română.
+- **Limbă:** engleză (implicit) sau română, din Setări. Analiza, rapoartele, exporturile și CLI-ul sunt în engleză; varianta română a interfeței folosește `src/i18n` (textele generate de analiză rămân în engleză).
 - **Tabletă și telefon** (≤ 900 px): replay-ul afișează un singur panou, cu selector, și o singură coloană care se derulează vertical.
 - **Încărcare:** vederile, three.js și uPlot se încarcă la nevoie; codul inițial are ~125 KB comprimat.
 - **Fără cereri către terți:** fonturile Poppins și JetBrains Mono sunt incluse în aplicație (`@fontsource`, cu subsetul latin-ext pentru ă, ș, ț). `vercel.json` setează o politică CSP care permite doar resursele proprii.

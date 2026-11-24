@@ -88,7 +88,7 @@ describe("synthetic recording", () => {
   it("falls back to sequential reading for un-indexed files", async () => {
     const u = (await analyzeRecording(nodeSource(UNIDX), { hash: false })).analysis;
     expect(u.indexed).toBe(false);
-    expect(u.warnings[0]).toContain("secvențial");
+    expect(u.warnings[0]).toContain("sequentially");
     expect(u.topics.find((t) => t.topic === "/imu/data")!.count).toBeGreaterThan(700);
   });
   it("cloud ↔ depth consistency flags exactly the injected +0.8 m offset frames (2.3)", async () => {

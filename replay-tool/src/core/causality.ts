@@ -143,9 +143,9 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
   // 1) type-based prior
   const prior = new Map<string, { role: Role; reason: string }>();
   for (const t of topics) {
-    if (SENSOR_TYPES.has(t.type)) prior.set(t.topic, { role: "input", reason: `tip de mesaj de senzor (${t.type})` });
-    else if (t.type === "tf2_msgs/TFMessage") prior.set(t.topic, { role: "input", reason: "transformări de coordonate (infrastructură, nu ieșire a componentei)" });
-    else prior.set(t.topic, { role: "output", reason: `tip derivat (${t.type}), nu e un tip brut de senzor` });
+    if (SENSOR_TYPES.has(t.type)) prior.set(t.topic, { role: "input", reason: `sensor message type (${t.type})` });
+    else if (t.type === "tf2_msgs/TFMessage") prior.set(t.topic, { role: "input", reason: "coordinate transforms (infrastructure, not a component output)" });
+    else prior.set(t.topic, { role: "output", reason: `derived type (${t.type}), not a raw sensor type` });
   }
 
   // 2) exact-stamp evidence between every pair
@@ -176,7 +176,7 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
       const best = srcs.sort((a, b) => b.matchRate - a.matchRate || isImg(b.input) - isImg(a.input) || Math.round((lead(b) - lead(a)) / 1e5) || nsAffinity(b.input, t.topic) - nsAffinity(a.input, t.topic))[0];
       prior.set(t.topic, {
         role: "output",
-        reason: `${(best.matchRate * 100).toFixed(0)}% din header.stamp-uri copiază ${best.input}, publicat cu mediana ${(summarize(best.latencyFromLog).p50 / 1e6).toFixed(1)} ms după intrare`,
+        reason: `${(best.matchRate * 100).toFixed(0)}% of its header.stamps copy ${best.input}; published a median ${(summarize(best.latencyFromLog).p50 / 1e6).toFixed(1)} ms after the input`,
       });
     }
   }

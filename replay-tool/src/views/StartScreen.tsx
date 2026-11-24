@@ -128,7 +128,7 @@ export function ErrorScreen() {
       <main className="start-hero" id="main-content" role="alert">
         <h2>{T.error}</h2>
         <div className="callout error">{err}</div>
-        <p className="muted small">{tr("Verifică faptul că fișierul este o înregistrare MCAP (ROS 2). Fișierele trunchiate sunt citite secvențial; dacă eroarea persistă, rulează")} <code>npm run inspect -- fișier.mcap</code> {tr("pentru detalii.")}</p>
+        <p className="muted small">{tr("Verifică faptul că fișierul este o înregistrare MCAP (ROS 2). Fișierele trunchiate sunt citite secvențial; dacă eroarea persistă, rulează")} <code>npm run inspect -- file.mcap</code> {tr("pentru detalii.")}</p>
         <button className="btn primary" onClick={() => app.set({ phase: "start" })}>{T.retry}</button>
       </main>
       <Footer />

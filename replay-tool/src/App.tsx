@@ -76,7 +76,7 @@ export function App() {
   if (phase !== "ready" && view === "styleguide")
     return (
       <div className="app" style={{ gridTemplateRows: "56px 1fr" }}>
-        <header className="topbar"><Logo height={22} /><span className="spacer" /><button className="btn sm" onClick={() => { app.set({ view: "replay" }); history.replaceState(null, "", location.pathname); }}>Înapoi</button></header>
+        <header className="topbar"><Logo height={22} /><span className="spacer" /><button className="btn sm" onClick={() => { app.set({ view: "replay" }); history.replaceState(null, "", location.pathname); }}>Back</button></header>
         <main className="main"><Suspense fallback={<ViewFallback />}><StyleguideView /></Suspense></main>
         <TooltipLayer />
       </div>

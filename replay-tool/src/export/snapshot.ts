@@ -40,18 +40,18 @@ export async function downloadSnapshot(): Promise<void> {
   if (!png) return;
   const blob = await (await fetch(png)).blob();
   download(`lumen-replay-${(clock.get().t / 1e9).toFixed(3)}s.png`, blob, "image/png");
-  toast("Captură PNG salvată");
+  toast("PNG snapshot saved");
 }
 
 /** Renders the A–B interval to WebM at `fps` frames per (recording) second. */
 export async function exportVideo(fps = 10): Promise<void> {
   const s = app.get();
   if (s.markA === undefined || s.markB === undefined) {
-    toast("Setează întâi cursoarele A și B (intervalul de exportat)");
+    toast("Set cursors A and B first (the interval to export)");
     return;
   }
   if (typeof MediaRecorder === "undefined") {
-    toast("Browserul nu suportă MediaRecorder");
+    toast("This browser does not support MediaRecorder");
     return;
   }
   app.set({ view: "replay" });
@@ -72,7 +72,7 @@ export async function exportVideo(fps = 10): Promise<void> {
   const done = new Promise<void>((r) => (mr.onstop = () => r()));
   mr.start();
   const frames = Math.max(1, Math.ceil(((hi - lo) / 1e9) * fps));
-  toast(`Export video: ${frames} cadre…`);
+  toast(`Video export: ${frames} frames…`);
   for (let k = 0; k <= frames; k++) {
     seek(lo + (k / frames) * (hi - lo));
     await new Promise((r) => setTimeout(r, 120)); // let panels fetch & draw
@@ -84,5 +84,5 @@ export async function exportVideo(fps = 10): Promise<void> {
   mr.stop();
   await done;
   download(`lumen-replay-${(lo / 1e9).toFixed(2)}-${(hi / 1e9).toFixed(2)}s.webm`, new Blob(chunks, { type: "video/webm" }), "video/webm");
-  toast("Video exportat");
+  toast("Video exported");
 }

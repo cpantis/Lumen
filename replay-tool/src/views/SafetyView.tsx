@@ -26,11 +26,11 @@ export function SafetyView() {
     const items: Array<{ t: number; dur: number; what: string; topics: string[] }> = [];
     for (const o of outputs) for (let i = 1; i < o.count; i++) {
       const d = o.log[i] - o.log[i - 1];
-      if (d > 2 * o.rate.medianPeriodNs) items.push({ t: o.log[i - 1], dur: d, what: `fără ieșire nouă pe ${o.topic}`, topics: [o.topic] });
+      if (d > 2 * o.rate.medianPeriodNs) items.push({ t: o.log[i - 1], dur: d, what: `no new output on ${o.topic}`, topics: [o.topic] });
     }
     for (const e of a.edges.filter((x) => x.kind === "exact")) {
       const ot = a.topics.find((t) => t.topic === e.output)!;
-      for (let j = 0; j < e.latency.length; j++) if (e.latency[j] > e.latencySummary.p95 * 1.5) items.push({ t: ot.log[j], dur: e.latency[j], what: `latență ${fmt.ms(e.latency[j])} ${e.input} → ${e.output}`, topics: [e.input, e.output] });
+      for (let j = 0; j < e.latency.length; j++) if (e.latency[j] > e.latencySummary.p95 * 1.5) items.push({ t: ot.log[j], dur: e.latency[j], what: `latency ${fmt.ms(e.latency[j])} ${e.input} → ${e.output}`, topics: [e.input, e.output] });
     }
     return items.sort((x, y) => y.dur - x.dur).slice(0, 25);
   }, [a, outputs]);
@@ -49,8 +49,8 @@ export function SafetyView() {
       </div>
       <Section title={tr("Viteza de mers")}>
         <div className="stats" style={{ marginBottom: 12 }}>
-          <Stat value={`${speed.toFixed(2)} m/s`} label={s.speedOverride ? "viteză (editată manual)" : motion.method === "imu-steps" ? "viteză estimată din IMU" : "viteză presupusă"} />
-          <Stat value={Number.isFinite(motion.cadenceHz) ? `${motion.cadenceHz.toFixed(2)} pași/s` : "—"} label={tr("cadență")} />
+          <Stat value={`${speed.toFixed(2)} m/s`} label={s.speedOverride ? "speed (edited manually)" : motion.method === "imu-steps" ? "speed estimated from the IMU" : "assumed speed"} />
+          <Stat value={Number.isFinite(motion.cadenceHz) ? `${motion.cadenceHz.toFixed(2)} steps/s` : "—"} label={tr("cadență")} />
           <Stat value={motion.stepTimes.length} label={tr("pași detectați")} />
           <Stat value={motion.confidence} label={tr("încredere")} />
         </div>
@@ -64,7 +64,7 @@ export function SafetyView() {
         {imu && <Plot x={imu.log} series={imuS} time height={140} shade={steps} title={tr("Pași detectați (benzi) pe |a| din IMU")} />}
       </Section>
 
-      <Section title={tr("Timp → distanță, pentru fiecare ieșire")} sub={`La ${speed.toFixed(2)} m/s. „Orb” = distanța parcursă fără o ieșire nouă.`}>
+      <Section title={tr("Timp → distanță, pentru fiecare ieșire")} sub={`At ${speed.toFixed(2)} m/s. "Blind" = distance walked without a new output.`}>
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
             <thead><tr><th>{tr("Ieșire")}</th><th className="num">{tr("Între două ieșiri (mediană)")}</th><th className="num">{tr("Cel mai lung gol → distanță oarbă")}</th><th className="num">{tr("Latență p50 → distanță")}</th><th className="num">{tr("Latență p95")}</th><th className="num">{tr("Latență max")}</th></tr></thead>
@@ -86,17 +86,17 @@ export function SafetyView() {
             </tbody>
           </table>
         </div>
-        <Kv items={[["Referință", "un obstacol raportat cu latența L e la o distanță mai mică cu v·L decât arată ieșirea; un gol G înseamnă v·G metri fără percepție nouă"]]} />
+        <Kv items={[["Reference", "an obstacle reported with latency L is v·L closer than the output shows; a gap G means v·G metres without new perception"]]} />
       </Section>
 
       <Section title={`${tr("Cerințe critice pentru siguranță — profil")} ${s.profile === "strict" ? tr("Strict") : tr("Derivat")}`}>
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
             <thead><tr><th>{tr("ID")}</th><th>{tr("Cerință")}</th><th>{tr("Verdict")}</th><th>{tr("De ce contează")}</th></tr></thead>
-            <tbody>{safety.map((r) => <tr key={r.id}><td className="mono">{r.id}</td><td>{trField(r.title, r.title_en)}</td><td><StatusBadge kind={verdictKind(r.verdict)} /></td><td className="small">{r.rationale}</td></tr>)}</tbody>
+            <tbody>{safety.map((r) => <tr key={r.id}><td className="mono">{r.id}</td><td>{trField(r.title_ro ?? r.title, r.title)}</td><td><StatusBadge kind={verdictKind(r.verdict)} /></td><td className="small">{r.rationale}</td></tr>)}</tbody>
           </table>
         </div>
-        <p className="small muted" style={{ marginTop: 8 }}>„Utile” (nu critice): {other.map((r) => r.id).join(", ")}</p>
+        <p className="small muted" style={{ marginTop: 8 }}>"Useful" (not critical): {other.map((r) => r.id).join(", ")}</p>
       </Section>
 
       <Section title={tr("Cele mai grave momente")} sub={tr("Ordonate după distanța parcursă „orbește” (gol de ieșire sau latență mare). Click → salt în replay.")}>

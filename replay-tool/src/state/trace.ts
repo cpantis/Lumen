@@ -45,6 +45,6 @@ export function trace(): Trace {
 
 export function traceLine(): string {
   const t = trace();
-  const cal = Object.keys(t.calibrations).length ? ` · calibrări: ${Object.entries(t.calibrations).map(([k, v]) => `${k}=${(v as { source: string }).source}`).join(", ")}` : "";
-  return `${t.tool} · ${t.file} · SHA-256 ${t.sha256} · profil ${t.profile} (praguri #${t.thresholds_hash})${cal} · viteză ${t.speed_mps.toFixed(2)} m/s · ${t.generated_at}`;
+  const cal = Object.keys(t.calibrations).length ? ` · calibrations: ${Object.entries(t.calibrations).map(([k, v]) => `${k}=${(v as { source: string }).source}`).join(", ")}` : "";
+  return `${t.tool} · ${t.file} · SHA-256 ${t.sha256} · profile ${t.profile} (thresholds #${t.thresholds_hash})${cal} · speed ${t.speed_mps.toFixed(2)} m/s · ${t.generated_at}`;
 }

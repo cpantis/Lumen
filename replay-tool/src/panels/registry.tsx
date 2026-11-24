@@ -7,21 +7,21 @@ import { ImagePanel } from "./ImagePanel";
 import { CloudPanel, MarkerPanel, PosePanel, TfPanel } from "./ScenePanels";
 
 export function panelKindLabel(type: string): string {
-  if (/Image/.test(type)) return "imagine";
-  if (/PointCloud2/.test(type)) return "nor 3D";
-  if (/Imu/.test(type)) return "grafic IMU";
-  if (/TFMessage/.test(type)) return "arbore TF";
-  if (/Marker/.test(type)) return "markeri 3D";
+  if (/Image/.test(type)) return "image";
+  if (/PointCloud2/.test(type)) return "3D cloud";
+  if (/Imu/.test(type)) return "IMU plot";
+  if (/TFMessage/.test(type)) return "TF tree";
+  if (/Marker/.test(type)) return "3D markers";
   if (/CameraInfo/.test(type)) return "text";
-  if (/OccupancyGrid/.test(type)) return "grilă 2D";
-  if (/LaserScan/.test(type)) return "scanare 2D";
-  if (/Pose/.test(type)) return "poză 3D";
-  return "JSON + grafice";
+  if (/OccupancyGrid/.test(type)) return "2D grid";
+  if (/LaserScan/.test(type)) return "2D scan";
+  if (/Pose/.test(type)) return "3D pose";
+  return "JSON + plots";
 }
 
 export function PanelFor({ cfg, topics }: { cfg: PanelConfig; topics: TopicData[] }) {
   const t = topics.find((x) => x.topic === cfg.topic);
-  if (!t) return <div className="panel"><div className="panel-empty">Topicul {cfg.topic} nu există în această înregistrare</div></div>;
+  if (!t) return <div className="panel"><div className="panel-empty">Topic {cfg.topic} does not exist in this recording</div></div>;
   const t2 = cfg.topic2 ? topics.find((x) => x.topic === cfg.topic2) : undefined;
   if (cfg.kind === "overlay") return <OverlayPanel cfg={cfg} topic={t} cloud={t2} />;
   if (cfg.kind === "diff") return <DiffPanel cfg={cfg} a={t} b={t2} />;

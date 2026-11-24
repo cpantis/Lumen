@@ -317,7 +317,7 @@ export function sensitivity(cost: (cal: Calibration) => number, cal: Calibration
     const dn = cost(withParam(cal, k, v - d));
     const rise = (up + dn) / 2 - c0;
     const rel = c0 > 1e-9 ? rise / c0 : rise;
-    const confidence = rel > 0.1 ? "ridicată" : rel > 0.01 ? "medie" : "scăzută";
+    const confidence = rel > 0.1 ? "high" : rel > 0.01 ? "medium" : "low";
     return { key: k, value: v, delta: d, costMinus: dn, cost0: c0, costPlus: up, relativeRise: rel, confidence };
   });
 }

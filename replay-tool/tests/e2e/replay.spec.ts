@@ -40,7 +40,7 @@ test("loads the recording, plays and scrubs; panels update", async ({ page }) =>
   await expect(panel.locator(".head-status .meta")).not.toHaveText(idxBefore);
 
   // frame stepping on a chosen topic
-  await page.getByLabel("Pas pe topicul").selectOption("/cam_front/depth");
+  await page.getByLabel("Step on topic").selectOption("/cam_front/depth");
   const before = parseFloat(await cursorText(page));
   await page.keyboard.press("ArrowRight");
   expect(parseFloat(await cursorText(page))).toBeGreaterThan(before);
@@ -48,31 +48,31 @@ test("loads the recording, plays and scrubs; panels update", async ({ page }) =>
 
 test("analysis views render the injected defects", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("tab", { name: /Inventar/ }).click();
-  await expect(page.getByText("100% din header.stamp-uri copiază /cam_front/image_raw").first()).toBeVisible();
-  await page.getByRole("tab", { name: /Cauzalitate/ }).click();
+  await page.getByRole("tab", { name: /Inventory/ }).click();
+  await expect(page.getByText("100% of its header.stamps copy /cam_front/image_raw").first()).toBeVisible();
+  await page.getByRole("tab", { name: /Causality/ }).click();
   await expect(page.locator("svg.diagram")).toBeVisible();
-  await page.getByRole("tab", { name: /Cerințe/ }).click();
+  await page.getByRole("tab", { name: /Requirements/ }).click();
   await expect(page.locator("tr", { hasText: "REQ-CONT-06" }).first().getByText("FAIL").first()).toBeVisible();
   // expand a requirement and jump to a violation
   await page.locator("tr", { hasText: "REQ-OUT-02" }).first().click();
-  await page.locator("tr.clickable", { hasText: "gol de" }).first().click();
+  await page.locator("tr.clickable", { hasText: "gap of" }).first().click();
   await expect(page.locator(".replay")).toBeVisible();
-  await page.getByRole("tab", { name: /Siguranță/ }).click();
-  await expect(page.getByText("viteză estimată din IMU")).toBeVisible();
+  await page.getByRole("tab", { name: /Safety/ }).click();
+  await expect(page.getByText("speed estimated from the IMU")).toBeVisible();
 });
 
 test("overlay projection, consistency over time and parameter estimation", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("tab", { name: /Consistență/ }).click();
+  await page.getByRole("tab", { name: /FOV consistency/ }).click();
   const fov = page.locator("section", { hasText: "FOV cam_front" });
-  await expect(fov.getByText("Sursa calibrării: camera_info+tf")).toBeVisible({ timeout: 20_000 });
-  await fov.getByRole("button", { name: "Calculează consistența în timp" }).click();
-  await expect(fov.getByText(/din \d+ cadre eșantionate peste 5 %/)).toBeVisible({ timeout: 60_000 });
-  await fov.getByRole("button", { name: "Estimează parametrii bifați" }).click();
-  await expect(fov.getByText(/Estimare pe \d+ cadre/)).toBeVisible({ timeout: 60_000 });
-  await fov.getByRole("button", { name: "Deschide proiecția în replay" }).click();
-  await expect(page.locator(".panel", { hasText: "Proiecție /cam_front/points" })).toBeVisible();
+  await expect(fov.getByText("Calibration source: camera_info+tf")).toBeVisible({ timeout: 20_000 });
+  await fov.getByRole("button", { name: "Compute consistency over time" }).click();
+  await expect(fov.getByText(/of \d+ sampled frames above 5 %/)).toBeVisible({ timeout: 60_000 });
+  await fov.getByRole("button", { name: "Estimate the checked parameters" }).click();
+  await expect(fov.getByText(/Estimation on \d+ frames/)).toBeVisible({ timeout: 60_000 });
+  await fov.getByRole("button", { name: "Open the projection in the replay" }).click();
+  await expect(page.locator(".panel", { hasText: "Projection /cam_front/points" })).toBeVisible();
 });
 
 test("bug report, notes, command palette, report import", async ({ page }) => {
@@ -85,11 +85,11 @@ test("bug report, notes, command palette, report import", async ({ page }) => {
   await openDemo(page);
   // bug from the transport bar
   await page.getByRole("button", { name: "Bug", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: /Creează bug/ })).toBeVisible();
-  await page.getByLabel("Titlu scurt și specific").fill("Gol de 670 ms în ieșirea cam_front");
-  await page.getByRole("button", { name: "Salvează bug" }).click();
-  await page.getByRole("tab", { name: /Bug-uri/ }).click();
-  await expect(page.getByText("Gol de 670 ms în ieșirea cam_front")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /Create bug/ })).toBeVisible();
+  await page.getByLabel("Short, specific title").fill("670 ms gap in the cam_front output");
+  await page.getByRole("button", { name: "Save bug" }).click();
+  await page.getByRole("tab", { name: /Bugs/ }).click();
+  await expect(page.getByText("670 ms gap in the cam_front output")).toBeVisible();
 
   // command palette: jump to a timestamp
   await page.keyboard.press("Control+k");
@@ -98,23 +98,23 @@ test("bug report, notes, command palette, report import", async ({ page }) => {
   await expect(page.locator(".time-display .num")).toContainText("7.500");
 
   // import the CLI report → markers + list
-  await page.getByRole("tab", { name: /Cerințe/ }).click();
+  await page.getByRole("tab", { name: /Requirements/ }).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Importă raport" }).click();
+  await page.getByRole("button", { name: "Import report" }).click();
   await (await chooser).setFiles("out/e2e/report-strict.json");
   await expect(page.getByText("report-strict.json").first()).toBeVisible();
 });
 
 test("styleguide is reachable without a file", async ({ page }) => {
   await page.goto("/#/styleguide");
-  await expect(page.getByRole("heading", { name: "Design system .lumen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: ".lumen design system" })).toBeVisible();
 });
 
 for (const theme of ["dark", "light"] as const) {
   test(`accessibility audit (axe, WCAG AA) — ${theme} theme`, async ({ page }) => {
     await openDemo(page, theme);
     await page.waitForTimeout(1500);
-    const views = ["Replay", "Inventar", "Cerințe"];
+    const views = ["Replay", "Inventory", "Requirements"];
     for (const v of views) {
       await page.getByRole("tab", { name: new RegExp(v) }).click();
       await page.waitForTimeout(800);

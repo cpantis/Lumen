@@ -7,7 +7,7 @@ import { evaluate, parseThresholds, type EffectiveRoles, type RequirementResult 
 import { firstAfter, lastAtOrBefore } from "../core/sync";
 import type { Analysis, Role, TopicData } from "../core/types";
 import { worker } from "../worker/client";
-import { announce, app, clock, toast, type AppState, type PanelConfig, uid } from "./store";
+import { announce, app, clock, toast, type AppState, type Note, type PanelConfig, uid } from "./store";
 import type { Layout } from "react-grid-layout";
 
 // ---------------------------------------------------------------- classification
@@ -123,7 +123,7 @@ export function savedLayouts(): Record<string, { panels: PanelConfig[]; layout: 
 export function saveLayout(name: string): void {
   const s = app.get();
   safeSet(LAYOUTS, { ...savedLayouts(), [name]: { panels: s.panels, layout: s.layout } });
-  toast(`Layout „${name}” salvat`);
+  toast(`Layout "${name}" saved`);
 }
 export function loadLayout(name: string): void {
   const l = savedLayouts()[name];
@@ -176,7 +176,7 @@ export function importClassification(json: string): void {
     if (v.fov) fovOverrides[k] = v.fov;
   }
   app.set({ roleOverrides, fovOverrides });
-  toast("Clasificare importată");
+  toast("Classification imported");
 }
 
 // ---------------------------------------------------------------- default layout
@@ -207,7 +207,7 @@ export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: P
 // ---------------------------------------------------------------- opening files
 export async function openFile(file: File): Promise<void> {
   worker.reset();
-  app.set({ phase: "loading", file, progress: { phase: "deschidere", fraction: 0 }, error: undefined, playing: false });
+  app.set({ phase: "loading", file, progress: { phase: "opening", fraction: 0 }, error: undefined, playing: false });
   pushRecent(file);
   try {
     const s0 = app.get();
@@ -218,7 +218,8 @@ export async function openFile(file: File): Promise<void> {
       phase: "ready",
       roleOverrides: saved.roleOverrides ?? {},
       fovOverrides: saved.fovOverrides ?? {},
-      notes: saved.notes ?? [],
+      // notes saved by older versions used Romanian tags
+      notes: (saved.notes ?? []).map((n) => ({ ...n, tag: ({ întrebare: "question", presupunere: "assumption", anomalie: "anomaly" } as Record<string, Note["tag"]>)[n.tag] ?? n.tag })),
       bugs: saved.bugs ?? [],
       calibrations: saved.calibrations ?? {},
       manualAssumptions: saved.manualAssumptions ?? [],
@@ -239,20 +240,20 @@ export async function openFile(file: File): Promise<void> {
     const firstOut = Math.min(...analysis.topics.filter((t) => effectiveRole(t, app.get()) === "output" && t.count).map((t) => t.log[0]));
     const startT = url.t !== undefined && Number.isFinite(url.t) ? url.t : Number.isFinite(firstOut) ? firstOut : 0;
     clock.set({ t: Math.max(0, Math.min(analysis.durationNs, startT)) });
-    announce(`Înregistrare încărcată: ${analysis.topics.length} topicuri, ${(analysis.durationNs / 1e9).toFixed(1)} secunde.`);
+    announce(`Recording loaded: ${analysis.topics.length} topics, ${(analysis.durationNs / 1e9).toFixed(1)} seconds.`);
     if (!prefs.get().tourDone) app.set({ tourStep: 0 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg === "anulat") return;
+    if (msg === "cancelled") return;
     app.set({ phase: "error", error: msg });
   }
 }
 
 export async function openDemo(): Promise<void> {
-  app.set({ phase: "loading", progress: { phase: "descărcare demo", fraction: 0 } });
+  app.set({ phase: "loading", progress: { phase: "downloading demo", fraction: 0 } });
   try {
     const res = await fetch("./demo.mcap");
-    if (!res.ok) throw new Error(`demo.mcap indisponibil (HTTP ${res.status}). Rulează „npm run gen:synthetic -- public/demo.mcap”.`);
+    if (!res.ok) throw new Error(`demo.mcap unavailable (HTTP ${res.status}). Run "npm run gen:synthetic -- public/demo.mcap".`);
     const blob = await res.blob();
     await openFile(new File([blob], "demo-synthetic.mcap"));
   } catch (e) {
@@ -302,7 +303,7 @@ function announceGaps(from: number, to: number) {
   for (const t of a.topics) {
     for (const g of t.gaps) {
       if (g.startNs >= from && g.startNs < to && g.durationNs > 2.5 * t.rate.medianPeriodNs) {
-        announce(`Gol de date pe ${t.topic}: ${(g.durationNs / 1e6).toFixed(0)} ms`);
+        announce(`Data gap on ${t.topic}: ${(g.durationNs / 1e6).toFixed(0)} ms`);
         lastAnnounced = to;
         return;
       }
@@ -359,7 +360,7 @@ export function setSpeed(dir: 1 | -1): void {
   const i = speeds.indexOf(s);
   const next = speeds[Math.max(0, Math.min(speeds.length - 1, (i < 0 ? 3 : i) + dir))];
   app.set({ speed: next });
-  announce(`Viteză ${next}×`);
+  announce(`Speed ${next}×`);
 }
 
 // ---------------------------------------------------------------- URL state

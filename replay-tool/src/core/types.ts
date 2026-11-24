@@ -106,7 +106,7 @@ export interface MotionEstimate {
   cadenceHz: number;
   stepLengthM: number;
   speedMps: number;
-  confidence: "ridicată" | "medie" | "scăzută";
+  confidence: "high" | "medium" | "low";
   note: string;
 }
 

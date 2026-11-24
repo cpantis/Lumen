@@ -55,8 +55,8 @@ export function UsageInfo({ topic, index }: { topic: TopicData; index: number })
         const used = j >= 0 ? e.inputIndex[j] : -1;
         const lag = used >= 0 ? index - used : NaN;
         return (
-          <span key={e.output} data-tip={`Ieșirea curentă ${e.output} a fost produsă din cadrul #${used + 1} al acestui topic`}>
-            {used === index ? `✓ folosit de ${e.output}` : used >= 0 ? `${e.output} ← #${used + 1} (${lag} cadre în urmă)` : `${e.output}: —`}
+          <span key={e.output} data-tip={`The current output ${e.output} was produced from frame #${used + 1} of this topic`}>
+            {used === index ? `✓ used by ${e.output}` : used >= 0 ? `${e.output} ← #${used + 1} (${lag} frames behind)` : `${e.output}: —`}
           </span>
         );
       })}
@@ -125,7 +125,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
     >
       {index < 0 && !matchedFrom && <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div>}
       {index < 0 && matchedFrom && <div className="panel-empty">{tr("Ieșirea curentă nu are un cadru de intrare corespunzător")}</div>}
-      <canvas ref={canvas} onMouseMove={onMove} onMouseLeave={() => setReadout("")} aria-label={`Imagine ${topic.topic}`} role="img" />
+      <canvas ref={canvas} onMouseMove={onMove} onMouseLeave={() => setReadout("")} aria-label={`Image ${topic.topic}`} role="img" />
       {isDepthTopic && (
         <div className="row xs" style={{ position: "absolute", left: 8, bottom: 6, background: "var(--surface)", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--border)" }} onMouseDown={(e) => e.stopPropagation()}>
           <label className="row" style={{ gap: 4 }}>

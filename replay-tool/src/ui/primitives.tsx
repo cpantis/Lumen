@@ -44,11 +44,11 @@ export function StatusBadge({ kind, label }: { kind: StatusKind; label?: string 
   const map: Record<StatusKind, { cls: string; icon: ReactNode; text: string }> = {
     ok: { cls: "ok", icon: <CheckCircle2 aria-hidden />, text: "OK" },
     pass: { cls: "ok", icon: <CheckCircle2 aria-hidden />, text: "PASS" },
-    warn: { cls: "warn", icon: <Clock3 aria-hidden />, text: "Întârziat" },
-    stale: { cls: "error", icon: <AlertTriangle aria-hidden />, text: "Expirat" },
+    warn: { cls: "warn", icon: <Clock3 aria-hidden />, text: "Late" },
+    stale: { cls: "error", icon: <AlertTriangle aria-hidden />, text: "Stale" },
     fail: { cls: "error", icon: <XCircle aria-hidden />, text: "FAIL" },
-    none: { cls: "neutral", icon: <CircleSlash aria-hidden />, text: "Fără date" },
-    empty: { cls: "warn", icon: <CircleSlash aria-hidden />, text: "Gol" },
+    none: { cls: "neutral", icon: <CircleSlash aria-hidden />, text: "No data" },
+    empty: { cls: "warn", icon: <CircleSlash aria-hidden />, text: "Empty" },
     invalid: { cls: "error", icon: <XCircle aria-hidden />, text: "Invalid" },
     na: { cls: "neutral", icon: <HelpCircle aria-hidden />, text: "N/A" },
   };
@@ -65,7 +65,7 @@ export function verdictKind(v: string): StatusKind {
   return v === "PASS" ? "pass" : v === "FAIL" ? "fail" : "na";
 }
 
-export function BrailleLoader({ label = "Se încarcă" }: { label?: string }) {
+export function BrailleLoader({ label = "Loading" }: { label?: string }) {
   return (
     <span className="braille-loader" role="status" aria-label={label}>
       {Array.from({ length: 12 }, (_, i) => (

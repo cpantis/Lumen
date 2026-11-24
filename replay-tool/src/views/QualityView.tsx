@@ -48,19 +48,19 @@ export function QualityView() {
 
   const s1 = useMemo(() => (t ? [
     { label: "NaN/Inf", color: "var(--error)", values: t.content.nanRatio, width: 1 },
-    { label: "zero / fără retur", color: "var(--warn)", values: t.content.zeroRatio, width: 1 },
+    { label: "zero / no return", color: "var(--warn)", values: t.content.zeroRatio, width: 1 },
     { label: "valid", color: "var(--accent)", values: valid, width: 1.5 },
   ] : []), [t, valid]);
-  const s2 = useMemo(() => (t ? [{ label: "în afara intervalului plauzibil", color: "var(--error)", values: t.content.outOfRangeRatio, width: 1 }] : []), [t]);
+  const s2 = useMemo(() => (t ? [{ label: "outside the plausible range", color: "var(--error)", values: t.content.outOfRangeRatio, width: 1 }] : []), [t]);
   const s3 = useMemo(() => (t ? [
     { label: "min", color: "var(--accent-2)", values: t.content.min, width: 1 },
-    { label: "medie", color: "var(--accent)", values: t.content.mean, width: 1.5 },
+    { label: "mean", color: "var(--accent)", values: t.content.mean, width: 1.5 },
     { label: "max", color: "var(--warn)", values: t.content.max, width: 1 },
   ] : []), [t]);
   const s4 = useMemo(() => (t ? [
-    { label: "cadru identic cu anteriorul", color: "var(--warn)", values: dup, points: true, width: 0 },
-    { label: "gol(1) / invalid(2)", color: "var(--error)", values: flags, points: true, width: 0 },
-    { label: "elemente (puncte/pixeli) / max", color: "var(--accent-2)", values: (() => { let m = 0; for (const v of t.content.elements) m = Math.max(m, v); return Float32Array.from(t.content.elements, (v) => v / (m || 1)); })(), width: 1 },
+    { label: "frame identical to the previous one", color: "var(--warn)", values: dup, points: true, width: 0 },
+    { label: "empty(1) / invalid(2)", color: "var(--error)", values: flags, points: true, width: 0 },
+    { label: "elements (points/pixels) / max", color: "var(--accent-2)", values: (() => { let m = 0; for (const v of t.content.elements) m = Math.max(m, v); return Float32Array.from(t.content.elements, (v) => v / (m || 1)); })(), width: 1 },
   ] : []), [t, dup, flags]);
   const th1 = useMemo(() => {
     const out: Array<{ value: number; label: string; color?: string }> = [];
@@ -74,13 +74,13 @@ export function QualityView() {
     const o = lim("out_of_range_max", "max_ratio");
     return o !== undefined ? [{ value: o, label: `max ${fmt.pct(o, 0)}`, color: "var(--error)" }] : [];
   }, [s.profile, s.thresholdsText]); // eslint-disable-line react-hooks/exhaustive-deps
-  const unit = t && /Imu/.test(t.type) ? "|a| m/s²" : t && /Image/.test(t.type) && !/16UC1|32FC1/i.test(t.details["encoding"] ?? "") ? "intensitate" : "m";
+  const unit = t && /Imu/.test(t.type) ? "|a| m/s²" : t && /Image/.test(t.type) && !/16UC1|32FC1/i.test(t.details["encoding"] ?? "") ? "intensity" : "m";
 
   return (
     <div className="view" id="main-content">
       <div className="view-title">
         <h2>{tr("Calitatea conținutului")}</h2>
-        <span className="sub">{tr("Nu doar „a sosit mesajul?”, ci „ce conține?” — profil activ:")} <b>{s.profile === "strict" ? "Strict" : "Derivat"}</b></span>
+        <span className="sub">{tr("Nu doar „a sosit mesajul?”, ci „ce conține?” — profil activ:")} <b>{s.profile === "strict" ? tr("Strict") : tr("Derivat")}</b></span>
         <span className="spacer" />
         <div className="btn-group" role="group" aria-label={tr("Profil de praguri")}>
           <button className="btn sm" aria-pressed={s.profile === "derived"} onClick={() => app.set({ profile: "derived" })}>{tr("Derivat")}</button>
@@ -121,7 +121,7 @@ export function QualityView() {
             <Plot x={t.log} series={s4} time height={200} shade={[...shadeFor("duplicate_max"), ...shadeFor("empty_max"), ...shadeFor("invalid_max")]} title={tr("Cadre înghețate, goale, invalide; număr de elemente")} csvName={`${t.topic}_integritate`} />
           </div>
           <p className="xs muted">
-            Metodă: imaginile se evaluează pe o sub-grilă deterministă de ≤ 50 000 pixeli; norii de puncte pe toate punctele (distanța euclidiană în m); „identic” = hash FNV-1a pe ≤ 4096 octeți eșantionați + lungime. Intervale plauzibile: {JSON.stringify(s.thresholds?.plausible_ranges)}.
+            Method: images are evaluated on a deterministic sub-grid of ≤ 50,000 pixels; point clouds on every point (Euclidean distance in m); "identical" = FNV-1a hash over ≤ 4096 sampled bytes + length. Plausible ranges: {JSON.stringify(s.thresholds?.plausible_ranges)}.
           </p>
         </Section>
       )}

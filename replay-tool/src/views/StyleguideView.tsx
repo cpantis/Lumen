@@ -71,7 +71,7 @@ export function StyleguideView() {
         <div className="panel" style={{ height: 220 }}>
           <div className="panel-head">
             <span className="role-bar" style={{ background: "var(--role-fov1)" }} />
-            <div style={{ flex: 1 }}><div className="title">/cam_front/depth</div><div className="meta">sensor_msgs/Image · 13.43 Hz · ieșire cam_front</div></div>
+            <div style={{ flex: 1 }}><div className="title">/cam_front/depth</div><div className="meta">sensor_msgs/Image · 13.43 Hz · output cam_front</div></div>
             <StatusBadge kind="ok" />
           </div>
           <div className="panel-body"><div className="panel-empty">{tr("Corpul panoului")}</div></div>
@@ -79,7 +79,7 @@ export function StyleguideView() {
         </div>
         <div className="card">
           <h4>{tr("Grafic (uPlot) cu prag și zonă de încălcare")}</h4>
-          <Plot x={x} series={series} time height={150} thresholds={[{ value: 85, label: "p95 limită" }]} shade={[[1.5e9, 2.2e9]]} />
+          <Plot x={x} series={series} time height={150} thresholds={[{ value: 85, label: "p95 limit" }]} shade={[[1.5e9, 2.2e9]]} />
         </div>
       </section>
       <div className="callout">{tr("Callout informativ")}</div>

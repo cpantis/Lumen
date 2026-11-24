@@ -328,7 +328,7 @@ async function main() {
   await writer.addMetadata({ name: "recording", metadata: new Map([["device", "synthetic .lumen glasses"], ["scenario", "outdoor walk, crosswalk"]]) });
   await writer.end();
   fw.close();
-  console.log(`Scris ${out}: ${queue.length} mesaje, ${SECONDS} s${UNINDEXED ? " (neindexat)" : ""}`);
+  console.log(`Wrote ${out}: ${queue.length} messages, ${SECONDS} s${UNINDEXED ? " (unindexed)" : ""}`);
 }
 
 main().catch((e) => {

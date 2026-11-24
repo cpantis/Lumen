@@ -50,7 +50,7 @@ const post = (r: Response, transfer: Transferable[] = []) => self.postMessage(r,
 
 function topicData(topic: string) {
   const t = analysis?.topics.find((x) => x.topic === topic);
-  if (!t) throw new Error(`Topic necunoscut: ${topic}`);
+  if (!t) throw new Error(`Unknown topic: ${topic}`);
   return t;
 }
 
@@ -100,7 +100,7 @@ async function getMessage(topic: string, index: number, render?: RenderOptions):
   let bytes = 1024;
   try {
     const raw = await readRaw(topic, index);
-    if (!raw) throw new Error("Mesajul nu a putut fi citit din fișier");
+    if (!raw) throw new Error("The message could not be read from the file");
     bytes += raw.length;
     out.msg = d.decoder(raw);
     const type = shortType(d.schemaName);
@@ -120,7 +120,7 @@ async function getMessage(topic: string, index: number, render?: RenderOptions):
         // a bitmap can only be transferred once → keep raw bytes in cache, re-create on demand
         out.bitmap = bmp;
       } catch {
-        out.error = `Imagine comprimată nedecodabilă (format "${m.format}")`;
+        out.error = `Undecodable compressed image (format "${m.format}")`;
       }
     }
   } catch (err) {

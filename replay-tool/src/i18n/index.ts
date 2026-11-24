@@ -144,9 +144,9 @@ const dicts: Record<Lang, Dict> = { ro, en };
 let lang: Lang = ((): Lang => {
   try {
     const p = JSON.parse(localStorage.getItem("lumen.prefs") || "{}");
-    return p.lang === "en" ? "en" : "ro";
+    return p.lang === "ro" ? "ro" : "en"; // English by default
   } catch {
-    return "ro";
+    return "en";
   }
 })();
 const subs = new Set<() => void>();

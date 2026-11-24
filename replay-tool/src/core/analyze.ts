@@ -51,14 +51,14 @@ const MAGIC = [0x89, 0x4d, 0x43, 0x41, 0x50, 0x30, 0x0d, 0x0a]; // "\x89MCAP0\r\
 
 /** Clear error for files that are not MCAP (ROS 1 bag, rosbag2 SQLite, LFS pointer…). */
 async function assertMcap(src: RecordingSource): Promise<void> {
-  if (src.size < 8) throw new Error("Fișierul e prea mic pentru a fi MCAP (sub 8 octeți).");
+  if (src.size < 8) throw new Error("The file is too small to be MCAP (under 8 bytes).");
   const head = await src.readSlice(0, Math.min(src.size, 64));
   if (MAGIC.every((b, i) => head[i] === b)) return;
   const text = new TextDecoder().decode(head);
-  if (text.startsWith("#ROSBAG")) throw new Error("Fișierul e un rosbag ROS 1 (.bag), nu MCAP. Convertește-l cu: mcap convert fișier.bag fișier.mcap");
-  if (text.startsWith("SQLite format 3")) throw new Error("Fișierul e un rosbag2 SQLite (.db3), nu MCAP. Convertește-l cu: ros2 bag convert (storage_id: mcap) sau mcap convert fișier.db3 fișier.mcap");
-  if (text.startsWith("version https://git-lfs")) throw new Error("Fișierul e un pointer Git LFS, nu înregistrarea propriu-zisă. Descarcă fișierul real (git lfs pull).");
-  throw new Error("Fișierul nu începe cu semnătura MCAP (\\x89MCAP0\\r\\n): nu e un fișier MCAP valid.");
+  if (text.startsWith("#ROSBAG")) throw new Error("This is a ROS 1 rosbag (.bag), not MCAP. Convert it with: mcap convert file.bag file.mcap");
+  if (text.startsWith("SQLite format 3")) throw new Error("This is a rosbag2 SQLite file (.db3), not MCAP. Convert it with: ros2 bag convert (storage_id: mcap) or mcap convert file.db3 file.mcap");
+  if (text.startsWith("version https://git-lfs")) throw new Error("This is a Git LFS pointer, not the recording itself. Download the real file (git lfs pull).");
+  throw new Error("The file does not start with the MCAP magic (\\x89MCAP0\\r\\n): it is not a valid MCAP file.");
 }
 
 /** Opens a recording: indexed reader when possible, sequential fallback otherwise. */
@@ -79,16 +79,16 @@ export async function openRecording(src: RecordingSource, onProgress?: Progress,
         if (end === undefined || ci.messageEndTime > end) end = ci.messageEndTime;
       }
     }
-    if (reader.chunkIndexes.length === 0) throw new Error("fără chunk index");
+    if (reader.chunkIndexes.length === 0) throw new Error("no chunk index");
     // Index usable only if every non-empty chunk has message indexes (Message Index records are
     // optional in MCAP) and the summary repeats the Channel records (otherwise channels live only
     // inside chunks, which the indexed reader does not see).
-    if (reader.chunkIndexes.some((ci) => ci.messageIndexOffsets.size === 0 && ci.messageEndTime !== 0n)) throw new Error("chunk-uri fără Message Index");
-    if (channels.size === 0) throw new Error("rezumatul nu conține înregistrările Channel");
+    if (reader.chunkIndexes.some((ci) => ci.messageIndexOffsets.size === 0 && ci.messageEndTime !== 0n)) throw new Error("chunks without Message Index");
+    if (channels.size === 0) throw new Error("the summary does not contain the Channel records");
     return { indexed: true, reader, channels, schemas, startNs: start ?? 0n, endNs: end ?? 0n, warnings };
   } catch (err) {
     warnings.push(
-      `Index MCAP inutilizabil (${err instanceof Error ? err.message : String(err)}): fișierul se citește secvențial, integral. Funcționează, dar e mai lent și ține mesajele în memorie.`,
+      `MCAP index unusable (${err instanceof Error ? err.message : String(err)}): the file is read sequentially, in full. This works, but is slower and keeps the messages in memory.`,
     );
   }
   // Sequential fallback
@@ -105,10 +105,10 @@ export async function openRecording(src: RecordingSource, onProgress?: Progress,
         else if (rec.type === "Channel") channels.set(rec.id, { id: rec.id, topic: rec.topic, messageEncoding: rec.messageEncoding, schemaId: rec.schemaId, metadata: rec.metadata });
         else if (rec.type === "Message") messages.push({ channelId: rec.channelId, logTime: rec.logTime, data: rec.data.slice() });
       }
-      onProgress?.("citire secvențială", Math.min(1, (s + CH) / src.size));
+      onProgress?.("sequential read", Math.min(1, (s + CH) / src.size));
     }
   } catch (err) {
-    warnings.push(`Citirea secvențială s-a oprit: ${err instanceof Error ? err.message : String(err)}. Se folosesc ${messages.length} mesaje citite până acolo.`);
+    warnings.push(`Sequential reading stopped: ${err instanceof Error ? err.message : String(err)}. Using the ${messages.length} messages read up to that point.`);
   }
   messages.sort((a, b) => (a.logTime < b.logTime ? -1 : a.logTime > b.logTime ? 1 : 0));
   const startNs = messages.length ? messages[0].logTime : 0n;
@@ -150,10 +150,10 @@ export async function openSalvage(src: RecordingSource, reader: McapIndexedReade
     } catch (err) {
       bad.push(`chunk #${k + 1} @${start} (${(Number(ci.messageStartTime - reader.chunkIndexes[0].messageStartTime) / 1e9).toFixed(2)} s – ${(Number(ci.messageEndTime - reader.chunkIndexes[0].messageStartTime) / 1e9).toFixed(2)} s): ${err instanceof Error ? err.message : String(err)}`);
     }
-    onProgress?.("recuperare chunk-uri", (k + 1) / cis.length);
+    onProgress?.("recovering chunks", (k + 1) / cis.length);
   }
   messages.sort((a, b) => (a.logTime < b.logTime ? -1 : a.logTime > b.logTime ? 1 : 0));
-  const warnings = bad.length ? [`${bad.length} din ${cis.length} chunk-uri sunt deteriorate și au fost omise (date lipsă în intervalele lor): ${bad.join("; ")}`] : [];
+  const warnings = bad.length ? [`${bad.length} of ${cis.length} chunks are damaged and were skipped (data missing in their intervals): ${bad.join("; ")}`] : [];
   // keep the recording's real time span (from the index) so times stay comparable with other tools
   const st = reader.statistics;
   const startNs = st && st.messageCount > 0n ? st.messageStartTime : cis.reduce((m, c) => (c.messageStartTime < m ? c.messageStartTime : m), cis[0]?.messageStartTime ?? 0n);
@@ -177,50 +177,50 @@ export function formatDetails(type: string, msg: any): Record<string, string> {
   if (msg?.header?.frame_id !== undefined) d["frame_id"] = msg.header.frame_id || "(gol)";
   switch (type) {
     case "sensor_msgs/Image": {
-      d["rezoluție"] = `${msg.width}×${msg.height}`;
+      d["resolution"] = `${msg.width}×${msg.height}`;
       d["encoding"] = msg.encoding;
       d["step"] = `${msg.step} B`;
       d["endianness"] = msg.is_bigendian ? "big" : "little";
       const e = String(msg.encoding).toLowerCase();
-      d["unități"] = e === "16uc1" ? "adâncime în mm (REP-118)" : e === "32fc1" ? "adâncime în m (REP-118)" : "intensitate 0–255 per canal";
+      d["units"] = e === "16uc1" ? "depth in mm (REP-118)" : e === "32fc1" ? "depth in m (REP-118)" : "intensity 0–255 per channel";
       break;
     }
     case "sensor_msgs/CompressedImage":
       d["format"] = msg.format;
-      d["unități"] = "imagine comprimată (octeți)";
+      d["units"] = "compressed image (bytes)";
       break;
     case "sensor_msgs/CameraInfo": {
       const k = Array.from(msg.k ?? []) as number[];
-      d["rezoluție"] = `${msg.width}×${msg.height}`;
-      d["model distorsiune"] = msg.distortion_model || "(nespecificat)";
-      if (k.length === 9) d["intrinseci"] = `fx=${k[0].toFixed(1)} fy=${k[4].toFixed(1)} cx=${k[2].toFixed(1)} cy=${k[5].toFixed(1)} px`;
+      d["resolution"] = `${msg.width}×${msg.height}`;
+      d["distortion model"] = msg.distortion_model || "(unspecified)";
+      if (k.length === 9) d["intrinsics"] = `fx=${k[0].toFixed(1)} fy=${k[4].toFixed(1)} cx=${k[2].toFixed(1)} cy=${k[5].toFixed(1)} px`;
       d["D"] = `[${Array.from(msg.d ?? []).map((v) => Number(v).toFixed(4)).join(", ")}]`;
       break;
     }
     case "sensor_msgs/PointCloud2": {
       const names: Record<number, string> = { 1: "i8", 2: "u8", 3: "i16", 4: "u16", 5: "i32", 6: "u32", 7: "f32", 8: "f64" };
-      d["câmpuri"] = (msg.fields ?? []).map((f: any) => `${f.name}:${names[f.datatype] ?? f.datatype}`).join(", ");
+      d["fields"] = (msg.fields ?? []).map((f: any) => `${f.name}:${names[f.datatype] ?? f.datatype}`).join(", ");
       d["point_step"] = `${msg.point_step} B`;
-      d["puncte (primul mesaj)"] = `${msg.width * msg.height} (${msg.width}×${msg.height})`;
+      d["points (first message)"] = `${msg.width * msg.height} (${msg.width}×${msg.height})`;
       d["is_dense"] = String(msg.is_dense);
-      d["unități"] = "metri, în frame-ul din header";
+      d["units"] = "metres, in the header frame";
       break;
     }
     case "sensor_msgs/Imu":
-      d["unități"] = "accelerație m/s², viteză unghiulară rad/s, orientare cuaternion";
-      d["orientare furnizată"] = msg.orientation_covariance?.[0] === -1 ? "nu (covarianță −1)" : "da";
+      d["units"] = "acceleration m/s², angular velocity rad/s, orientation quaternion";
+      d["orientation provided"] = msg.orientation_covariance?.[0] === -1 ? "no (covariance −1)" : "yes";
       break;
     case "tf2_msgs/TFMessage":
-      d["transformări"] = (msg.transforms ?? []).map((t: any) => `${t.header.frame_id}→${t.child_frame_id}`).join(", ");
-      d["unități"] = "translație m, rotație cuaternion";
+      d["transforms"] = (msg.transforms ?? []).map((t: any) => `${t.header.frame_id}→${t.child_frame_id}`).join(", ");
+      d["units"] = "translation m, rotation quaternion";
       break;
     case "sensor_msgs/LaserScan":
-      d["unghiuri"] = `${msg.angle_min?.toFixed(3)}…${msg.angle_max?.toFixed(3)} rad, pas ${msg.angle_increment?.toFixed(4)}`;
-      d["interval"] = `${msg.range_min}…${msg.range_max} m`;
+      d["angles"] = `${msg.angle_min?.toFixed(3)}…${msg.angle_max?.toFixed(3)} rad, step ${msg.angle_increment?.toFixed(4)}`;
+      d["range"] = `${msg.range_min}…${msg.range_max} m`;
       break;
     case "nav_msgs/OccupancyGrid":
-      d["grilă"] = `${msg.info?.width}×${msg.info?.height} @ ${msg.info?.resolution} m/celulă`;
-      d["unități"] = "probabilitate ocupare 0–100, −1 necunoscut";
+      d["grid"] = `${msg.info?.width}×${msg.info?.height} @ ${msg.info?.resolution} m/cell`;
+      d["units"] = "occupancy probability 0–100, −1 unknown";
       break;
   }
   return d;
@@ -334,13 +334,13 @@ export async function analyzeRecording(
     const type = shortType(a.schema?.name ?? "");
     if (!a.details) a.details = formatDetails(type, msg);
     a.samples.push(contentMetrics(a.schema?.name ?? "", msg, ranges));
-    if (++k % 500 === 0) progress("analiză mesaje", Math.min(1, Number(m.logTime - start) / span));
+    if (++k % 500 === 0) progress("analysing messages", Math.min(1, Number(m.logTime - start) / span));
   }
   } catch (err) {
     // A corrupt chunk / inconsistent index during indexed reading: redo everything sequentially.
     if (rec.indexed && rec.reader) {
       const again = await openSalvage(src, rec.reader, progress);
-      again.warnings.unshift(`Citirea indexată a eșuat (${err instanceof Error ? err.message : String(err)}); fiecare chunk a fost verificat separat (CRC).`);
+      again.warnings.unshift(`Indexed reading failed (${err instanceof Error ? err.message : String(err)}); every chunk was checked separately (CRC).`);
       return analyzeRecording(src, { ...opts, hash: false, opened: again }).then((r) => ({ ...r, analysis: { ...r.analysis, sha256: sha } }));
     }
     rec.warnings.push(`Citirea s-a oprit: ${err instanceof Error ? err.message : String(err)}.`);
@@ -350,11 +350,11 @@ export async function analyzeRecording(
   const statCount = rec.reader?.statistics?.messageCount;
   if (rec.indexed && (unknownChannel > 0 || (statCount !== undefined && statCount > 0n && BigInt(total + unknownChannel) !== statCount))) {
     const again = await openRecording(src, progress, true);
-    again.warnings.unshift(`Indexul nu acoperă toate mesajele (statistici: ${statCount ?? "?"}, găsite prin index: ${total}, canal necunoscut: ${unknownChannel}); s-a citit secvențial.`);
+    again.warnings.unshift(`The index does not cover every message (statistics: ${statCount ?? "?"}, found through the index: ${total}, unknown channel: ${unknownChannel}); the file was read sequentially.`);
     return analyzeRecording(src, { ...opts, hash: false, opened: again }).then((r) => ({ ...r, analysis: { ...r.analysis, sha256: sha } }));
   }
-  if (unknownChannel) rec.warnings.push(`${unknownChannel} mesaje referă un canal fără înregistrare Channel și au fost ignorate.`);
-  progress("analiză mesaje", 1);
+  if (unknownChannel) rec.warnings.push(`${unknownChannel} messages reference a channel without a Channel record and were ignored.`);
+  progress("analysing messages", 1);
 
   const topics: TopicData[] = [];
   for (const a of accs.values()) {
@@ -381,16 +381,16 @@ export async function analyzeRecording(
       content.mean[i] = s.mean;
       content.hash[i] = s.hash;
     });
-    const type = shortType(a.schema?.name ?? "(fără schemă)");
+    const type = shortType(a.schema?.name ?? "(no schema)");
     // header detected from the data (works for every encoding, incl. Foxglove "timestamp")
     const header = stamp.some((v) => Number.isFinite(v));
     const rate = rateStats(log);
     const sizeSorted = Array.from(size).sort((x, y) => x - y);
     const details = { ...(a.details ?? {}) };
-    if (n) details["dimensiune mesaj"] = `mediană ${sizeSorted[n >> 1]} B (min ${sizeSorted[0]}, max ${sizeSorted[n - 1]})`;
+    if (n) details["message size"] = `median ${sizeSorted[n >> 1]} B (min ${sizeSorted[0]}, max ${sizeSorted[n - 1]})`;
     const root = rootDefinition(a.schema);
     if (root && Object.keys(a.details ?? {}).length <= 1) {
-      details["câmpuri"] = root.definitions.filter((f) => !f.isConstant).map((f) => `${f.name}:${f.type}${f.isArray ? "[]" : ""}`).join(", ");
+      details["fields"] = root.definitions.filter((f) => !f.isConstant).map((f) => `${f.name}:${f.type}${f.isArray ? "[]" : ""}`).join(", ");
     }
     topics.push({
       topic: a.ch.topic,
@@ -416,7 +416,7 @@ export async function analyzeRecording(
     });
   }
   topics.sort((x, y) => x.topic.localeCompare(y.topic));
-  progress("cauzalitate", 0.5);
+  progress("causality", 0.5);
   const { edges, fovGroups } = inferCausality(topics);
 
   const imu = topics.find((t) => t.type === "sensor_msgs/Imu" && t.count > 0);
@@ -430,7 +430,7 @@ export async function analyzeRecording(
       /* metadata is optional */
     }
   }
-  progress("gata", 1);
+  progress("done", 1);
   return {
     opened: rec,
     analysis: {

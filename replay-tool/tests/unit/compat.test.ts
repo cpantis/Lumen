@@ -73,7 +73,7 @@ describe("ROS 1 recording from mcap-ros1-support", () => {
     const a = await analyze("ros1.mcap");
     expect(T(a, "/camera/image_raw").type).toBe("sensor_msgs/Image");
     expect(T(a, "/camera/image_raw").details["encoding"]).toBe("bgr8");
-    expect(T(a, "/camera/camera_info").details["intrinseci"]).toContain("fx=32.0");
+    expect(T(a, "/camera/camera_info").details["intrinsics"]).toContain("fx=32.0");
     expect(T(a, "/perception/points").autoRole).toBe("output");
     const ci = await first("ros1.mcap", "/camera/camera_info");
     expect(Array.from(ci.k as number[])[0]).toBeCloseTo(32, 6);
@@ -138,13 +138,13 @@ describe("damaged / wrong files", () => {
   it("truncated file: sequential fallback keeps the readable part, with a warning", async () => {
     const a = await analyze("truncated.mcap");
     expect(a.indexed).toBe(false);
-    expect(a.warnings.join(" ")).toMatch(/Index MCAP inutilizabil/);
+    expect(a.warnings.join(" ")).toMatch(/MCAP index unusable/);
     expect(T(a, "/camera/image_raw").count).toBeGreaterThan(20);
     expect(a.durationNs / 1e9).toBeLessThan(6);
   });
   it("corrupt chunk: damaged chunk skipped and reported, the rest recovered, real time span kept", async () => {
     const a = await analyze("corrupt_chunk.mcap");
-    expect(a.warnings.join(" ")).toMatch(/1 din 2 chunk-uri sunt deteriorate/);
+    expect(a.warnings.join(" ")).toMatch(/1 of 2 chunks are damaged/);
     expect(T(a, "/imu/data").count).toBeGreaterThan(200);
     expect(T(a, "/imu/data").rate.meanHz).toBeCloseTo(100, 0); // no garbage timestamps
     expect(a.durationNs / 1e9).toBeCloseTo(5.99, 1);

@@ -9,14 +9,14 @@ export function mermaidDiagram(a: Analysis, role: (t: TopicData) => Role, fov: (
   const lines = ["flowchart LR"];
   const inputs = a.topics.filter((t) => role(t) === "input");
   const outputs = a.topics.filter((t) => role(t) === "output");
-  lines.push('  subgraph IN["Intrări (senzori)"]');
+  lines.push('  subgraph IN["Inputs (sensors)"]');
   for (const t of inputs) lines.push(`    ${id(t.topic)}["${t.topic}<br/><small>${t.type} · ${t.rate.meanHz.toFixed(1)} Hz</small>"]`);
   lines.push("  end");
-  lines.push('  C(["Componentă<br/>(nedocumentată)"])');
-  const fovs = [...new Set(outputs.map((t) => fov(t) ?? "fără FOV"))];
+  lines.push('  C(["Component<br/>(undocumented)"])');
+  const fovs = [...new Set(outputs.map((t) => fov(t) ?? "no FOV"))];
   for (const f of fovs) {
-    lines.push(`  subgraph ${id("fov_" + f)}["Ieșiri FOV ${f}"]`);
-    for (const t of outputs.filter((o) => (fov(o) ?? "fără FOV") === f)) lines.push(`    ${id(t.topic)}["${t.topic}<br/><small>${t.type} · ${t.rate.meanHz.toFixed(1)} Hz</small>"]`);
+    lines.push(`  subgraph ${id("fov_" + f)}["Outputs FOV ${f}"]`);
+    for (const t of outputs.filter((o) => (fov(o) ?? "no FOV") === f)) lines.push(`    ${id(t.topic)}["${t.topic}<br/><small>${t.type} · ${t.rate.meanHz.toFixed(1)} Hz</small>"]`);
     lines.push("  end");
   }
   const usedInputs = new Set(a.edges.map((e) => e.input));
@@ -26,7 +26,7 @@ export function mermaidDiagram(a: Analysis, role: (t: TopicData) => Role, fov: (
     lines.push(`  ${id(t.topic)} ${exact ? "-->" : "-.->"} C`);
   }
   for (const e of a.edges) {
-    const label = `${e.kind === "exact" ? "stamp exact" : "temporal"} ${(e.matchRate * 100).toFixed(0)}% · p50 ${(e.latencySummary.p50 / 1e6).toFixed(0)} ms`;
+    const label = `${e.kind === "exact" ? "exact stamp" : "temporal"} ${(e.matchRate * 100).toFixed(0)}% · p50 ${(e.latencySummary.p50 / 1e6).toFixed(0)} ms`;
     lines.push(`  C ${e.kind === "exact" ? "-->" : "-.->"}|"${e.input.split("/").filter(Boolean)[0]}: ${label}"| ${id(e.output)}`);
   }
   return lines.join("\n");

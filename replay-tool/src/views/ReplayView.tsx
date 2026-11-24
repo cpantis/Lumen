@@ -34,7 +34,7 @@ function LatencyStrip() {
   const e = exact[Math.min(sel, exact.length - 1)];
   const ot = e && a.topics.find((t) => t.topic === e.output)!;
   const x = useMemo(() => (ot ? ot.log : new Float64Array()), [ot]);
-  const series = useMemo(() => (e ? [{ label: "latență (ms)", color: "var(--accent)", values: Array.from(e.latency, (v) => v / 1e6), points: true, width: 1 }] : []), [e]);
+  const series = useMemo(() => (e ? [{ label: "latency (ms)", color: "var(--accent)", values: Array.from(e.latency, (v) => v / 1e6), points: true, width: 1 }] : []), [e]);
   if (!e || !ot) return null;
   const j = indexAt(ot, cursor, source);
   const lat = j >= 0 ? e.latency[j] : NaN;
@@ -42,7 +42,7 @@ function LatencyStrip() {
     <div style={{ borderBottom: "1px solid var(--border)", padding: "4px 12px", background: "var(--surface)" }} data-tour="latency">
       <div className="row small wrap">
         <button className="btn sm ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? "▾" : "▸"} Latență live
+          {open ? "▾" : "▸"} Live latency
         </button>
         <select className="input" style={{ minHeight: 26 }} value={sel} onChange={(ev) => setSel(+ev.target.value)} aria-label={tr("Pereche intrare → ieșire")}>
           {exact.map((x2, i) => (
@@ -55,10 +55,10 @@ function LatencyStrip() {
           {fmt.ms(lat)}
         </span>
         <span className="muted" data-tip={tr("Distanța parcursă de utilizator în timpul latenței, la viteza estimată")}>
-          ≈ {fmtDistance(distanceM(lat, speed))} parcurși
+          ≈ {fmtDistance(distanceM(lat, speed))} walked
         </span>
         <span className="muted xs">
-          p50 {fmt.ms(e.latencySummary.p50)} · p95 {fmt.ms(e.latencySummary.p95)} · max {fmt.ms(e.latencySummary.max)} · latență = log_time(ieșire) − header.stamp(intrare)
+          p50 {fmt.ms(e.latencySummary.p50)} · p95 {fmt.ms(e.latencySummary.p95)} · max {fmt.ms(e.latencySummary.max)} · latency = log_time(output) − header.stamp(input)
         </span>
       </div>
       {open && <Plot x={x} series={series} time height={90} />}
@@ -209,7 +209,7 @@ function CompactPanels() {
           <PanelFor cfg={p} topics={a.topics} />
         </div>
       ) : (
-        <div className="panel-empty" style={{ position: "static", height: 200 }}>Niciun panou. {T.addPanel}.</div>
+        <div className="panel-empty" style={{ position: "static", height: 200 }}>No panels. {T.addPanel}.</div>
       )}
     </div>
   );
@@ -255,7 +255,7 @@ export function ReplayView() {
         {s.panels.length === 0 ? (
           <div className="panel-empty" style={{ position: "static", height: 300 }}>
             <LayoutGrid size={32} />
-            Niciun panou. Adaugă unul din „{T.addPanel}” sau revino la layout-ul implicit.
+            No panels. Add one with “{T.addPanel}” or go back to the default layout.
           </div>
         ) : (
           <RGL

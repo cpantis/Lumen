@@ -23,7 +23,7 @@ class WorkerClient {
         else p.resolve(r);
       };
       this.#worker.onerror = (e) => {
-        for (const p of this.#pending.values()) p.reject(new Error(e.message || "Eroare în worker"));
+        for (const p of this.#pending.values()) p.reject(new Error(e.message || "Worker error"));
         this.#pending.clear();
       };
     }
@@ -42,31 +42,31 @@ class WorkerClient {
   reset(): void {
     this.#worker?.terminate();
     this.#worker = undefined;
-    for (const p of this.#pending.values()) p.reject(new Error("anulat"));
+    for (const p of this.#pending.values()) p.reject(new Error("cancelled"));
     this.#pending.clear();
   }
 
   async open(file: File, onProgress: (phase: string, f: number) => void, ranges?: PlausibleRanges): Promise<Analysis> {
     const r = await this.#call({ op: "open", file, ranges } as Omit<Request, "id">, onProgress);
-    if (r.op !== "opened") throw new Error("răspuns neașteptat");
+    if (r.op !== "opened") throw new Error("unexpected response");
     return r.analysis;
   }
 
   async get(topic: string, index: number, render?: RenderOptions, prefetch = 3): Promise<DecodedMessage> {
     const r = await this.#call({ op: "get", topic, index, render, prefetch } as Omit<Request, "id">);
-    if (r.op !== "message") throw new Error("răspuns neașteptat");
+    if (r.op !== "message") throw new Error("unexpected response");
     return r.message;
   }
 
   async series(topic: string, path: string, maxPoints?: number): Promise<{ t: Float64Array; v: Float64Array; truncated: boolean }> {
     const r = await this.#call({ op: "series", topic, path, maxPoints } as Omit<Request, "id">);
-    if (r.op !== "series") throw new Error("răspuns neașteptat");
+    if (r.op !== "series") throw new Error("unexpected response");
     return r;
   }
 
   async schemas(): Promise<Array<{ name: string; encoding: string; text: string }>> {
     const r = await this.#call({ op: "schemas" } as Omit<Request, "id">);
-    if (r.op !== "schemas") throw new Error("răspuns neașteptat");
+    if (r.op !== "schemas") throw new Error("unexpected response");
     return r.schemas;
   }
 }

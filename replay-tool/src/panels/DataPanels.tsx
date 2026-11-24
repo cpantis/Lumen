@@ -79,7 +79,7 @@ export function ImuPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData })
           ))}
         </div>
       }
-      footer={<span>|a| curent {index >= 0 ? `${topic.content.min[index].toFixed(2)} m/s²` : "—"}</span>}
+      footer={<span>current |a| {index >= 0 ? `${topic.content.min[index].toFixed(2)} m/s²` : "—"}</span>}
     >
       <div className="panel-body scroll" tabIndex={0} style={{ position: "absolute", inset: 0, padding: 4 }}>
         {series ? <Plot x={series.x} series={series.s} time height={170} csvName={`${topic.topic.replace(/\W/g, "_")}_${mode}`} /> : <div className="skeleton" style={{ height: 160 }} />}
@@ -100,8 +100,8 @@ export function CameraInfoPanel({ cfg, topic }: { cfg: PanelConfig; topic: Topic
           <Kv
             items={[
               ["frame_id", m.header.frame_id],
-              ["rezoluție", `${m.width}×${m.height}`],
-              ["distorsiune", m.distortion_model],
+              ["resolution", `${m.width}×${m.height}`],
+              ["distortion", m.distortion_model],
               ["D", arr(m.d)],
               ["K", arr(m.k)],
               ["P", arr(m.p)],
@@ -193,8 +193,8 @@ export function JsonTree({ value, topic, path = "", depth = 0 }: { value: unknow
         {plottable && topic && (
           <button
             className="path-btn"
-            aria-label={`Grafic pentru ${path}`}
-            data-tip={`Grafic în timp pentru ${path}`}
+            aria-label={`Plot ${path}`}
+            data-tip={`Plot ${path} over time`}
             onClick={() => {
               const id = uid();
               app.set((s) => ({ panels: [...s.panels, { id, topic, kind: "plot", path }], layout: [...s.layout, { i: id, x: 0, y: 999, w: 6, h: 5, minW: 2, minH: 3 }], view: "replay" }));
@@ -219,7 +219,7 @@ export function JsonTree({ value, topic, path = "", depth = 0 }: { value: unknow
           <JsonTree value={v} topic={topic} path={Array.isArray(value) ? `${path}[${k}]` : path ? `${path}.${k}` : k} depth={depth + 1} />
         </div>
       ))}
-      {entries.length > shown.length && <div className="muted">… încă {entries.length - shown.length}</div>}
+      {entries.length > shown.length && <div className="muted">… {entries.length - shown.length} more</div>}
     </details>
   );
 }
