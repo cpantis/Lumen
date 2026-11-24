@@ -21,7 +21,10 @@ import { parse } from "@foxglove/rosmsg";
 import { MessageWriter } from "@foxglove/rosmsg2-serialization";
 import { openSync, writeSync, closeSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { constants as zlibConstants, zstdCompressSync } from "node:zlib";
+import * as zlib from "node:zlib";
+
+// node:zlib zstd exists from Node 22.15 / 23.8; older Node → lz4 fallback
+const nodeZstd = zlib as unknown as { zstdCompressSync?: (d: Uint8Array, o?: object) => Uint8Array; constants: Record<string, number> };
 // @ts-ignore — lz4js has no type declarations
 import * as lz4 from "lz4js";
 import { SCHEMAS } from "./schemas";
@@ -31,7 +34,7 @@ const out = args.find((a) => !a.startsWith("--") && !/^\d+$/.test(a)) ?? "fixtur
 const secIdx = args.indexOf("--seconds");
 const SECONDS = secIdx >= 0 ? Number(args[secIdx + 1]) : 20;
 const UNINDEXED = args.includes("--unindexed");
-const LZ4 = args.includes("--lz4"); // default: zstd (smaller demo download); --lz4 exercises the lz4 path
+const LZ4 = args.includes("--lz4") || !nodeZstd.zstdCompressSync; // default: zstd (smaller demo download); --lz4 exercises the lz4 path
 
 // ---------------------------------------------------------------------------------
 let seed = 0x1e5;
@@ -185,7 +188,7 @@ async function main() {
     compressChunk: (data) =>
       LZ4
         ? { compression: "lz4", compressedData: Uint8Array.from((lz4 as { compress: (d: Uint8Array) => ArrayLike<number> }).compress(data)) }
-        : { compression: "zstd", compressedData: new Uint8Array(zstdCompressSync(data, { params: { [zlibConstants.ZSTD_c_compressionLevel]: 12 } })) },
+        : { compression: "zstd", compressedData: new Uint8Array(nodeZstd.zstdCompressSync!(data, { params: { [nodeZstd.constants.ZSTD_c_compressionLevel]: 12 } })) },
   });
   await writer.start({ profile: "ros2", library: "lumen-replay synthetic generator" });
 
