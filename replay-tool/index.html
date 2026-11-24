@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ro" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content=".lumen Replay — replay sincronizat al intrărilor și ieșirilor componentei, din înregistrări ROS 2 MCAP ale Ochelarilor .lumen." />
+    <title>Replay — Ochelari .lumen</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Poppins:wght@200;300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Apply the saved theme before first paint (no flash).
+      try {
+        var s = JSON.parse(localStorage.getItem("lumen.prefs") || "{}");
+        var theme = s.theme || "dark"; // dark by default, like dotlumen.com
+        document.documentElement.dataset.theme = theme;
+        if (s.highContrast) document.documentElement.dataset.contrast = "high";
+        if (s.lang) document.documentElement.lang = s.lang;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

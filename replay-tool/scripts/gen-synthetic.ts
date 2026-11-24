@@ -6,7 +6,7 @@
  *
  *   cam_front depth/points  latency ~60 ms, spike +250 ms at frames 120–125,
  *                           random drops (4 %), burst drop frames 170–178,
- *                           point cloud offset +0.3 m at frames 200–215 (consistency bug)
+ *                           point cloud offset +0.8 m at frames 200–215 (consistency bug)
  *   cam_front image_raw     input gap ≈ 0.6 s at frames 240–248
  *   cam_down  depth/points  half rate (every 2nd frame), frozen depth 60–66,
  *                           empty cloud at frame 90, 70 % NaN at 100–110,
@@ -118,14 +118,14 @@ function render(cam: Cam, t: number): { rgb: Uint8Array; depth: Float32Array } {
         rgb[o] = 120 + v; rgb[o + 1] = 170 + v / 2; rgb[o + 2] = 235; // sky
         continue;
       }
-      depth[v * W + u] = s; // optical-frame z (direction has z = 1)
+      depth[v * W + u] = s * (1 + gauss() * 0.003); // optical-frame z (direction has z = 1) + sensor noise
       if (kind === 2) {
         rgb[o] = 200; rgb[o + 1] = 40; rgb[o + 2] = 50;
       } else {
         const gz = dwz * s + walked; // ground coordinate along the walk
         const gx = x * s;
         const stripe = Math.abs(gx) < 1.6 && Math.floor(gz / 0.6) % 2 === 0 && gz % 12 < 4;
-        const shade = Math.max(60, 170 - s * 6);
+        const shade = Math.max(60, 170 - s * 6) + gauss() * 3; // + photon noise
         rgb[o] = stripe ? 235 : shade + 40; // red-ish cycle lane like the real recording
         rgb[o + 1] = stripe ? 235 : shade * 0.45;
         rgb[o + 2] = stripe ? 235 : shade * 0.45;
@@ -293,7 +293,7 @@ async function main() {
       lastDepth.set(c.name, depthBytes);
       push(`/${c.name}/depth`, st + lat, { header, height: H, width: W, encoding: "16UC1", is_bigendian: 0, step: W * 2, data: depthBytes });
 
-      const cloud = !front && f === 90 ? { data: new Uint8Array(), width: 0 } : depthToCloud(depth, !front && f >= 100 && f <= 110 ? 0.7 : 0.02, front && f >= 200 && f <= 215 ? 0.3 : 0);
+      const cloud = !front && f === 90 ? { data: new Uint8Array(), width: 0 } : depthToCloud(depth, !front && f >= 100 && f <= 110 ? 0.7 : 0.02, front && f >= 200 && f <= 215 ? 0.8 : 0);
       push(`/${c.name}/points`, st + lat + 0.005 + Math.abs(gauss()) * 0.002, {
         header: { stamp: header.stamp, frame_id: `${c.name}_link` },
         height: 1,

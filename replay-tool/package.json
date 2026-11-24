@@ -5,12 +5,15 @@
   "description": ".lumen Replay — replay sincronizat pentru înregistrări ROS 2 MCAP ale Ochelarilor .lumen",
   "type": "module",
   "scripts": {
+    "predev": "tsx scripts/gen-synthetic.ts public/demo.mcap",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "prebuild": "tsx scripts/gen-synthetic.ts public/demo.mcap",
+    "build": "tsc -p . && vite build",
     "preview": "vite preview --port 4173",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -p .",
     "test": "vitest run",
     "test:e2e": "playwright test --trace off",
+    "test:all": "npm run typecheck && npm test && npm run build && npm run test:e2e",
     "gen:synthetic": "tsx scripts/gen-synthetic.ts",
     "inspect": "tsx scripts/inspect.ts",
     "metrics": "tsx scripts/metrics-cli.ts"

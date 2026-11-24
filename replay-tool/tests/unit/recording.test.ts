@@ -5,7 +5,11 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
-import { analyzeRecording } from "../../src/core/analyze";
+import { analyzeRecording, iterateAll, openRecording } from "../../src/core/analyze";
+import { makeDecoder } from "../../src/core/decode";
+import { pixelValue, type RosImage } from "../../src/core/image";
+import { parsePointCloud, type RosPointCloud2 } from "../../src/core/pointcloud";
+import { consistency, extrinsicsFromTf, intrinsicsFromCameraInfo, lookupTf, type TfEdge } from "../../src/core/projection";
 import { buildMetrics, crossCheck } from "../../src/core/metrics";
 import { compareReports, evaluate, parseReport, parseThresholds, regenerateDerived, toReport } from "../../src/core/requirements";
 import type { Analysis } from "../../src/core/types";
@@ -86,5 +90,38 @@ describe("synthetic recording", () => {
     expect(u.indexed).toBe(false);
     expect(u.warnings[0]).toContain("secvențial");
     expect(u.topics.find((t) => t.topic === "/imu/data")!.count).toBeGreaterThan(700);
+  });
+  it("cloud ↔ depth consistency flags exactly the injected +0.8 m offset frames (2.3)", async () => {
+    const rec = await openRecording(nodeSource(FILE));
+    const dec = (topic: string) => {
+      const ch = [...rec.channels.values()].find((c) => c.topic === topic)!;
+      return { id: ch.id, d: makeDecoder(ch, rec.schemas.get(ch.schemaId)) };
+    };
+    const want = ["/tf_static", "/cam_front/camera_info", "/cam_front/points", "/cam_front/depth"];
+    const D = Object.fromEntries(want.map((t) => [t, dec(t)]));
+    const msgs: Record<string, any[]> = Object.fromEntries(want.map((t) => [t, []]));
+    for await (const m of iterateAll(rec, want)) {
+      const t = want.find((x) => D[x].id === m.channelId)!;
+      msgs[t].push(D[t].d(m.data));
+    }
+    const edges: TfEdge[] = msgs["/tf_static"][0].transforms.map((x: any) => ({ parent: x.header.frame_id, child: x.child_frame_id, transform: x.transform }));
+    const cal = {
+      intrinsics: intrinsicsFromCameraInfo(msgs["/cam_front/camera_info"][0]),
+      extrinsics: extrinsicsFromTf(lookupTf(edges, "cam_front_link", "cam_front_optical")!),
+      source: "camera_info+tf" as const,
+    };
+    const depthByStamp = new Map(msgs["/cam_front/depth"].map((d: RosImage & { header: any }) => [`${d.header.stamp.sec}.${d.header.stamp.nanosec}`, d]));
+    const bad: number[] = [];
+    msgs["/cam_front/points"].forEach((pc: RosPointCloud2 & { header: any }) => {
+      const d = depthByStamp.get(`${pc.header.stamp.sec}.${pc.header.stamp.nanosec}`) as RosImage | undefined;
+      if (!d) return;
+      const r = consistency(parsePointCloud(pc).positions, cal, (u, v) => pixelValue(d, u, v) * 0.001);
+      const t = pc.header.stamp.sec + pc.header.stamp.nanosec / 1e9 - 1_763_000_000;
+      if (r.medianRelError > 0.05) bad.push(t);
+      else expect(r.medianRelError).toBeLessThan(0.02);
+    });
+    // frames 200–215 at 15 fps → t ∈ [13.35, 14.42] s
+    expect(bad.length).toBeGreaterThan(8);
+    expect(bad.every((t) => t > 13.3 && t < 14.5)).toBe(true);
   });
 });

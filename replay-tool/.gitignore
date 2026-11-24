@@ -5,3 +5,4 @@ fixtures/*.mcap
 test-results/
 playwright-report/
 *.tsbuildinfo
+public/demo.mcap

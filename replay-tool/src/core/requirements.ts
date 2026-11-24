@@ -7,7 +7,7 @@
  * CLI, the app and external test scripts can exchange reports.
  */
 import yaml from "js-yaml";
-import { mergeIntervals, summarize, windowRate } from "./stats";
+import { mergeIntervals, windowRate } from "./stats";
 import { NS_PER_MS, NS_PER_S } from "./time";
 import type { Analysis, Role, TopicData } from "./types";
 
