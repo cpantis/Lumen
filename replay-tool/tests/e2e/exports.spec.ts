@@ -8,7 +8,7 @@ import JSZip from "jszip";
 import { readFileSync } from "node:fs";
 
 async function openDemo(page: Page) {
-  await page.goto("/");
+  await page.goto("/?features=all"); // exercise the views hidden in the first delivery too
   await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true })));
   await page.reload();
   await page.getByTestId("demo").click();
@@ -23,8 +23,8 @@ async function bytes(d: Download): Promise<Buffer> {
 test("PNG snapshot of the layout", async ({ page }) => {
   await openDemo(page);
   await page.waitForTimeout(1500);
-  const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Captură PNG" }).click()]);
-  expect(d.suggestedFilename()).toMatch(/^lumen-replay-.*\.png$/);
+  const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "PNG snapshot" }).click()]);
+  expect(d.suggestedFilename()).toMatch(/^stamptrace-.*\.png$/);
   const b = await bytes(d);
   expect(b.subarray(1, 4).toString()).toBe("PNG");
   expect(b.length).toBeGreaterThan(20_000);
@@ -44,7 +44,7 @@ test("WebM video of the A–B interval", async ({ page }) => {
 
 test("inventory CSV and Markdown", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("tab", { name: /Inventar/ }).click();
+  await page.getByRole("tab", { name: /Inventory/ }).click();
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV", exact: true }).first().click()]);
   const text = (await bytes(csv)).toString("utf8");
   expect(text.split("\n")[0]).toContain("Topic");
@@ -55,7 +55,7 @@ test("inventory CSV and Markdown", async ({ page }) => {
   expect(m).toContain("| Topic |");
   expect(m).toMatch(/SHA-256 [0-9a-f]{64}/);
   // CSV of a plot (instant rate of the selected topic)
-  const [pc] = await Promise.all([page.waitForEvent("download"), page.locator("figure", { hasText: "Frecvența instantanee" }).getByRole("button", { name: "CSV" }).click()]);
+  const [pc] = await Promise.all([page.waitForEvent("download"), page.locator("figure", { hasText: "Instantaneous rate" }).getByRole("button", { name: "CSV" }).click()]);
   const rows = (await bytes(pc)).toString("utf8").trim().split("\n");
   expect(rows[0]).toContain("t_rel_s");
   expect(rows.length).toBeGreaterThan(100);
@@ -63,7 +63,7 @@ test("inventory CSV and Markdown", async ({ page }) => {
 
 test("test report JSON (derived) has failures with absolute ns times", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("tab", { name: /Cerințe/ }).click();
+  await page.getByRole("tab", { name: /Requirements/ }).click();
   const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "report-derived.json" }).click()]);
   const rep = JSON.parse((await bytes(d)).toString("utf8"));
   expect(rep.profile).toBe("derived");
@@ -77,9 +77,9 @@ test("bug ZIP contains Markdown and the snapshot", async ({ page }) => {
   await openDemo(page);
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: "Bug", exact: true }).click();
-  await page.getByLabel("Titlu scurt și specific").fill("Test ZIP");
-  await page.getByRole("button", { name: "Salvează bug" }).click();
-  await page.getByRole("tab", { name: /Bug-uri/ }).click();
+  await page.getByLabel("Short, specific title").fill("Test ZIP");
+  await page.getByRole("button", { name: "Save bug" }).click();
+  await page.getByRole("tab", { name: /Bugs/ }).click();
   const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /ZIP/ }).click()]);
   const zip = await JSZip.loadAsync(await bytes(d));
   const names = Object.keys(zip.files);
@@ -87,16 +87,16 @@ test("bug ZIP contains Markdown and the snapshot", async ({ page }) => {
   const md = names.find((n) => n.endsWith("bug.md"))!;
   const text = await zip.file(md)!.async("string");
   expect(text).toContain("## Test ZIP");
-  expect(text).toContain("Pași de reproducere");
+  expect(text).toContain("Steps to reproduce");
   expect(names.some((n) => n.endsWith(".png"))).toBe(true);
 });
 
 test("layout save dialog (no browser prompt)", async ({ page }) => {
   await openDemo(page);
-  await page.getByRole("button", { name: "Salvează layout" }).click();
-  await page.getByLabel("Numele layout-ului").fill("demo e2e");
-  await page.getByLabel("Numele layout-ului").press("Enter");
-  await expect(page.getByLabel("Încarcă layout")).toContainText("demo e2e");
+  await page.getByRole("button", { name: "Save layout" }).click();
+  await page.getByLabel("Layout name").fill("demo e2e");
+  await page.getByLabel("Layout name").press("Enter");
+  await expect(page.getByLabel("Load layout")).toContainText("demo e2e");
 });
 
 test.describe("compact mode on a phone", () => {
@@ -107,14 +107,14 @@ test.describe("compact mode on a phone", () => {
     await expect(page.locator(".replay.narrow")).toBeVisible();
     await expect(page.locator(".panel")).toHaveCount(1);
     const before = await page.locator(".panel .title").innerText();
-    await page.getByRole("button", { name: "Panoul următor" }).click();
+    await page.getByRole("button", { name: "Next panel" }).click();
     await expect(page.locator(".panel .title")).not.toHaveText(before);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
 });
 
 test("English interface (language switch)", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?features=all");
   await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true, lang: "en" })));
   await page.reload();
   await expect(page.getByText("Project for the dotLumen SW Test Challenge")).toBeVisible();
@@ -131,4 +131,30 @@ test("English interface (language switch)", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByLabel("Language").selectOption("ro");
   await expect(page.getByRole("heading", { name: "Ce înseamnă pentru utilizator" })).toBeVisible();
+});
+
+test("English is the default language", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.removeItem("lumen.prefs"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "StampTrace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open the demo recording" })).toBeVisible();
+});
+
+test("first delivery: Requirements, Safety and Bugs & notes are hidden", async ({ page }) => {
+  await page.goto("/?features=default");
+  await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true })));
+  await page.reload();
+  await page.getByTestId("demo").click();
+  await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
+  const tabs = await page.getByRole("tab").allInnerTexts();
+  expect(tabs.map((t) => t.trim())).toEqual(["Replay", "Inventory", "Causality & latency", "Content quality", "FOV consistency"]);
+  await expect(page.getByRole("button", { name: "Bug", exact: true })).toHaveCount(0);
+  await expect(page.getByText("requirement violation")).toHaveCount(0);
+  // a deep link to a hidden view falls back to the replay
+  await page.goto("/?features=default#?view=requirements");
+  await page.reload();
+  await page.getByTestId("demo").click();
+  await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
 });

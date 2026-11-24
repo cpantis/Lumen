@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Real-world style recordings written with the OFFICIAL MCAP writers (independent of
-the app's TypeScript code), to verify that .lumen Replay reads "another recording":
+the app's TypeScript code), to verify that StampTrace reads "another recording":
 
   ros2_zstd.mcap          mcap-ros2-support, zstd chunks (default of `ros2 bag record`)
   ros2_lz4.mcap           same content, lz4 chunks

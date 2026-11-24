@@ -190,7 +190,7 @@ async function main() {
         ? { compression: "lz4", compressedData: Uint8Array.from((lz4 as { compress: (d: Uint8Array) => ArrayLike<number> }).compress(data)) }
         : { compression: "zstd", compressedData: new Uint8Array(nodeZstd.zstdCompressSync!(data, { params: { [nodeZstd.constants.ZSTD_c_compressionLevel]: 12 } })) },
   });
-  await writer.start({ profile: "ros2", library: "lumen-replay synthetic generator" });
+  await writer.start({ profile: "ros2", library: "StampTrace synthetic generator" });
 
   const writers = new Map<string, MessageWriter>();
   const schemaIds = new Map<string, number>();
@@ -328,7 +328,7 @@ async function main() {
   await writer.addMetadata({ name: "recording", metadata: new Map([["device", "synthetic .lumen glasses"], ["scenario", "outdoor walk, crosswalk"]]) });
   await writer.end();
   fw.close();
-  console.log(`Scris ${out}: ${queue.length} mesaje, ${SECONDS} s${UNINDEXED ? " (neindexat)" : ""}`);
+  console.log(`Wrote ${out}: ${queue.length} messages, ${SECONDS} s${UNINDEXED ? " (unindexed)" : ""}`);
 }
 
 main().catch((e) => {

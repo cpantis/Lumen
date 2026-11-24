@@ -15,8 +15,8 @@ export function StyleguideView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>{tr("Design system .lumen")}</h2>
-        <span className="sub">{tr("Tokenuri, tipografie, componente — derivate din dotlumen.com și din logo")}</span>
+        <h2>{tr("Design system StampTrace")}</h2>
+        <span className="sub">{tr("Tokenuri, tipografie, componente — inspirate de identitatea vizuală .lumen")}</span>
       </div>
       <section className="card" style={{ marginBottom: 16 }}>
         <h3>Logo</h3>
@@ -24,6 +24,7 @@ export function StyleguideView() {
           <div style={{ color: "var(--text)" }}><Logo height={40} /></div>
           <div style={{ background: "#fff", color: "#161619", padding: 16, borderRadius: 8 }}><Logo height={40} /></div>
           <div style={{ background: "#000", color: "#fff", padding: 16, borderRadius: 8 }}><Logo height={40} /></div>
+          <Logo height={40} mark />
           <BrailleLoader />
         </div>
       </section>
@@ -71,7 +72,7 @@ export function StyleguideView() {
         <div className="panel" style={{ height: 220 }}>
           <div className="panel-head">
             <span className="role-bar" style={{ background: "var(--role-fov1)" }} />
-            <div style={{ flex: 1 }}><div className="title">/cam_front/depth</div><div className="meta">sensor_msgs/Image · 13.43 Hz · ieșire cam_front</div></div>
+            <div style={{ flex: 1 }}><div className="title">/cam_front/depth</div><div className="meta">sensor_msgs/Image · 13.43 Hz · output cam_front</div></div>
             <StatusBadge kind="ok" />
           </div>
           <div className="panel-body"><div className="panel-empty">{tr("Corpul panoului")}</div></div>
@@ -79,7 +80,7 @@ export function StyleguideView() {
         </div>
         <div className="card">
           <h4>{tr("Grafic (uPlot) cu prag și zonă de încălcare")}</h4>
-          <Plot x={x} series={series} time height={150} thresholds={[{ value: 85, label: "p95 limită" }]} shade={[[1.5e9, 2.2e9]]} />
+          <Plot x={x} series={series} time height={150} thresholds={[{ value: 85, label: "p95 limit" }]} shade={[[1.5e9, 2.2e9]]} />
         </div>
       </section>
       <div className="callout">{tr("Callout informativ")}</div>

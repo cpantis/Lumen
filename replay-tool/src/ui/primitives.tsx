@@ -1,38 +1,35 @@
 /**
- * UI primitives of the .lumen design system: logo, buttons, status badges, modal,
+ * UI primitives of the StampTrace design system: logo, buttons, status badges, modal,
  * global tooltips (data-tip), braille loader, key/value lists, file pickers.
  */
 import { AlertTriangle, CheckCircle2, CircleSlash, Clock3, HelpCircle, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { tr } from "../i18n";
 
+/** Author of StampTrace (shown on the start screen, in the help dialog and in every export). */
+export const AUTHOR = "Calin Pantis";
+
 /**
- * `.lumen` logo: 4×3 braille-style dot grid + wordmark (recreated as inline SVG).
- * The wordmark is drawn with thin rounded strokes; colours follow the theme.
+ * StampTrace logo. The mark is the app's core idea: two timeline rows (inputs on top,
+ * outputs below) and one stamp traced from an input frame to the output produced from
+ * it, later in time. `mark` renders the symbol only (favicon, compact headers).
  */
-export function Logo({ height = 22, title = ".lumen" }: { height?: number; title?: string }) {
-  const dark = [
-    [2, 0],
-    [2, 1],
-    [2, 2],
-    [1, 2],
-  ];
-  const isDark = (c: number, r: number) => dark.some(([x, y]) => x === c && y === r);
+export function Logo({ height = 22, title = "StampTrace", mark = false }: { height?: number; title?: string; mark?: boolean }) {
+  const top = [8, 22, 36, 50];
+  const bottom = [22, 36, 50];
   return (
-    <svg height={height} viewBox="0 0 330 64" role="img" aria-label={title} style={{ display: "block" }}>
+    <svg height={height} viewBox={mark ? "0 0 58 64" : "0 0 300 64"} role="img" aria-label={title} style={{ display: "block" }}>
       <title>{title}</title>
-      {Array.from({ length: 12 }, (_, k) => {
-        const c = k % 4, r = Math.floor(k / 4);
-        return <circle key={k} cx={10 + c * 20} cy={12 + r * 20} r={7.5} fill={isDark(c, r) ? "currentColor" : "#B2B2B2"} />;
-      })}
-      <g fill="none" stroke="currentColor" strokeWidth={5} strokeLinecap="butt">
-        <rect x={92} y={56} width={6} height={6} fill="currentColor" stroke="none" />
-        <path d="M110 2 V62" />
-        <path d="M126 22 V46 a14 14 0 0 0 28 0 V22" />
-        <path d="M168 62 V36 a12 12 0 0 1 24 0 V62 M192 36 a12 12 0 0 1 24 0 V62" />
-        <path d="M232 44 H262 a15 15 0 1 0 -4 11" />
-        <path d="M278 62 V36 a13 13 0 0 1 26 0 V62" />
-      </g>
+      <line x1={2} y1={18} x2={56} y2={18} stroke="currentColor" strokeOpacity={0.25} strokeWidth={2} />
+      <line x1={2} y1={46} x2={56} y2={46} stroke="currentColor" strokeOpacity={0.25} strokeWidth={2} />
+      {top.map((x) => <circle key={`t${x}`} cx={x} cy={18} r={4.5} fill={x === 22 ? "var(--accent)" : "#9a9aa0"} />)}
+      {bottom.map((x) => <circle key={`b${x}`} cx={x} cy={46} r={4.5} fill={x === 36 ? "var(--accent)" : "#9a9aa0"} />)}
+      <path d="M22 18 C 26 32, 32 32, 36 46" fill="none" stroke="var(--accent)" strokeWidth={3} strokeLinecap="round" />
+      {!mark && (
+        <text x={72} y={44} fill="currentColor" style={{ font: "300 34px Poppins, system-ui, sans-serif", letterSpacing: "-0.5px" }}>
+          Stamp<tspan style={{ fontWeight: 600 }}>Trace</tspan>
+        </text>
+      )}
     </svg>
   );
 }
@@ -44,11 +41,11 @@ export function StatusBadge({ kind, label }: { kind: StatusKind; label?: string 
   const map: Record<StatusKind, { cls: string; icon: ReactNode; text: string }> = {
     ok: { cls: "ok", icon: <CheckCircle2 aria-hidden />, text: "OK" },
     pass: { cls: "ok", icon: <CheckCircle2 aria-hidden />, text: "PASS" },
-    warn: { cls: "warn", icon: <Clock3 aria-hidden />, text: "Întârziat" },
-    stale: { cls: "error", icon: <AlertTriangle aria-hidden />, text: "Expirat" },
+    warn: { cls: "warn", icon: <Clock3 aria-hidden />, text: "Late" },
+    stale: { cls: "error", icon: <AlertTriangle aria-hidden />, text: "Stale" },
     fail: { cls: "error", icon: <XCircle aria-hidden />, text: "FAIL" },
-    none: { cls: "neutral", icon: <CircleSlash aria-hidden />, text: "Fără date" },
-    empty: { cls: "warn", icon: <CircleSlash aria-hidden />, text: "Gol" },
+    none: { cls: "neutral", icon: <CircleSlash aria-hidden />, text: "No data" },
+    empty: { cls: "warn", icon: <CircleSlash aria-hidden />, text: "Empty" },
     invalid: { cls: "error", icon: <XCircle aria-hidden />, text: "Invalid" },
     na: { cls: "neutral", icon: <HelpCircle aria-hidden />, text: "N/A" },
   };
@@ -65,11 +62,12 @@ export function verdictKind(v: string): StatusKind {
   return v === "PASS" ? "pass" : v === "FAIL" ? "fail" : "na";
 }
 
-export function BrailleLoader({ label = "Se încarcă" }: { label?: string }) {
+export function BrailleLoader({ label = "Loading" }: { label?: string }) {
   return (
     <span className="braille-loader" role="status" aria-label={label}>
-      {Array.from({ length: 12 }, (_, i) => (
-        <i key={i} style={{ animationDelay: `${(i % 4) * 0.12 + Math.floor(i / 4) * 0.05}s` }} />
+      {/* two timeline rows (inputs, outputs) whose ticks light up in sequence — the logo motif */}
+      {Array.from({ length: 8 }, (_, i) => (
+        <i key={i} style={{ animationDelay: `${(i % 4) * 0.15 + Math.floor(i / 4) * 0.3}s` }} />
       ))}
     </span>
   );

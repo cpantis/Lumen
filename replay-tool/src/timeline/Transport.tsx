@@ -6,6 +6,7 @@ import { useT } from "../i18n";
 import { seek, setPlaying, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, useClock } from "../state/store";
 import { openBugDraft, openNoteDraft } from "../views/bugs";
+import { features } from "../state/features";
 import { tr } from "../i18n";
 
 export function Transport() {
@@ -83,6 +84,7 @@ export function Transport() {
       <button className="btn sm icon" aria-pressed={s.loop} onClick={() => app.set({ loop: !s.loop })} aria-label={T.loop} data-tip={T.loop}>
         <Repeat size={14} />
       </button>
+      {features.issues && (<>
       <button className="btn sm" onClick={() => openBugDraft()} data-tip={tr("Creează un raport de bug pentru momentul curent sau intervalul A–B")}>
         <BugIcon size={14} /> Bug
       </button>
@@ -94,6 +96,7 @@ export function Transport() {
       >
         <StickyNote size={14} />
       </button>
+      </>)}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       const parsed = parsePointCloud(msg.msg as RosPointCloud2);
       let nan = 0;
       for (let i = 0; i < parsed.count; i++) if (!Number.isFinite(parsed.positions[i * 3])) nan++;
-      const scalar = field === "distanță" ? Float32Array.from({ length: parsed.count }, (_, i) => Math.hypot(parsed.positions[i * 3], parsed.positions[i * 3 + 1], parsed.positions[i * 3 + 2])) : parsed.fields[field];
+      const scalar = field === "distance" ? Float32Array.from({ length: parsed.count }, (_, i) => Math.hypot(parsed.positions[i * 3], parsed.positions[i * 3 + 1], parsed.positions[i * 3 + 2])) : parsed.fields[field];
       const { points } = makePoints(parsed.positions, scalar, size, cmap);
       a.group.add(points);
       setInfo({ n: parsed.count, nan, fields: parsed.fieldNames });
@@ -57,9 +57,9 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       toolbar={
         <>
           <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label={tr("Colorare după câmp")} value={field} onChange={(e) => setField(e.target.value)}>
-            {[...info.fields, "distanță"].map((f) => (
+            {[...info.fields, "distance"].map((f) => (
               <option key={f} value={f}>
-                culoare: {f}
+                colour: {f}
               </option>
             ))}
           </select>
@@ -68,8 +68,8 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       }
       footer={
         <>
-          <span>{info.n} puncte</span>
-          <span style={{ color: info.nan / Math.max(1, info.n) > 0.3 ? "var(--warn)" : undefined }}>NaN/invalide {fmt.pct(info.nan / Math.max(1, info.n))}</span>
+          <span>{info.n} points</span>
+          <span style={{ color: info.nan / Math.max(1, info.n) > 0.3 ? "var(--warn)" : undefined }}>NaN/invalid {fmt.pct(info.nan / Math.max(1, info.n))}</span>
           <span>frame {(msg?.msg as RosPointCloud2 | undefined)?.header?.frame_id ?? "—"}</span>
         </>
       }
@@ -124,7 +124,7 @@ export function TfPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }) 
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tfs.length} transformări</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tfs.length} transforms</span>}>
       <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
         <div ref={ref} style={{ position: "relative" }} />
         <div className="panel-body scroll" tabIndex={0} style={{ padding: 8, fontSize: 11 }}>
@@ -204,7 +204,7 @@ export function MarkerPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{markers.length} markeri</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{markers.length} markers</span>}>
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
     </PanelFrame>
   );

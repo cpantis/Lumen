@@ -25,7 +25,7 @@ export class BlobReadable implements McapTypes.IReadable {
   async read(offset: bigint, size: bigint): Promise<Uint8Array> {
     const start = Number(offset);
     const len = Number(size);
-    if (start + len > this.#blob.size) throw new Error("Citire dincolo de sfârșitul fișierului");
+    if (start + len > this.#blob.size) throw new Error("Read past the end of the file");
     // Large reads (big chunks) bypass the cache.
     if (len > BlobReadable.BLOCK) {
       return new Uint8Array(await this.#blob.slice(start, start + len).arrayBuffer());

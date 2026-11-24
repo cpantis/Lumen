@@ -787,6 +787,12 @@ table.t tr[aria-selected="true"] td {
 .start-hero h1 {
   margin-bottom: var(--space-3);
 }
+.start-hero .tagline {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: var(--space-4);
+}
 .start-hero .lead {
   font-size: var(--text-xl);
   font-weight: 200;
@@ -822,11 +828,12 @@ table.t tr[aria-selected="true"] td {
   flex-wrap: wrap;
 }
 
-/* ---------- braille loader (logo motif) ---------- */
+/* ---------- trace loader (logo motif: two timeline rows) ---------- */
 .braille-loader {
   display: inline-grid;
   grid-template-columns: repeat(4, 10px);
-  gap: 6px;
+  column-gap: 12px;
+  row-gap: 18px;
 }
 .braille-loader i {
   width: 10px;

@@ -11,8 +11,10 @@ import { app, clock, useApp, type ViewName } from "../state/store";
 import { downloadSnapshot, exportVideo } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
-import { fmt, Kv, Logo, Modal } from "./primitives";
+import { AUTHOR, fmt, Kv, Logo, Modal } from "./primitives";
+import { APP_VERSION, GIT_COMMIT } from "../state/trace";
 import { openBugDraft, openNoteDraft } from "../views/bugs";
+import { features, visibleViews } from "../state/features";
 import { tr } from "../i18n";
 
 export function applyTheme(theme: "dark" | "light", highContrast: boolean): void {
@@ -30,14 +32,13 @@ export function TopBar() {
   return (
     <header className="topbar">
       <a href="#main-content" className="skip-link">{tr("Sari la conținut")}</a>
-      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label={tr(".lumen Replay — acasă")}>
-        <Logo height={22} />
+      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label={tr("StampTrace — acasă")}>
+        <Logo height={30} />
       </button>
-      <span className="small hide-narrow" style={{ opacity: 0.75 }}>Replay</span>
       <div className="file" data-tour="file">
         {a && (
           <>
-            <b className="mono">{a.fileName}</b> <span style={{ opacity: 0.7 }}>· {fmt.s(a.durationNs, 2)} · {a.topics.length} topicuri · SHA-256 {a.sha256.slice(0, 12)}…</span>
+            <b className="mono">{a.fileName}</b> <span style={{ opacity: 0.7 }}>· {fmt.s(a.durationNs, 2)} · {a.topics.length} {tr("topicuri")} · SHA-256 {a.sha256.slice(0, 12)}…</span>
           </>
         )}
       </div>
@@ -70,14 +71,14 @@ export function Nav() {
   const T = useT();
   const view = useApp((s) => s.view);
   const s = useApp((st) => st);
-  const fails = results(s.profile, s).filter((r) => r.verdict === "FAIL").length;
-  const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues"];
+  const fails = features.requirements ? results(s.profile, s).filter((r) => r.verdict === "FAIL").length : 0;
+  const views = visibleViews();
   return (
     <nav className="nav" role="tablist" aria-label={tr("Vederi")} data-tour="nav">
       {views.map((v) => (
         <button key={v} role="tab" aria-selected={view === v} onClick={() => app.set({ view: v })}>
           {T.views[v as keyof typeof T.views]}
-          {v === "requirements" && fails > 0 && <span className="count" aria-label={`${fails} cerințe eșuate`}>{fails} FAIL</span>}
+          {v === "requirements" && fails > 0 && <span className="count" aria-label={`${fails} failed requirements`}>{fails} FAIL</span>}
           {v === "issues" && s.bugs.length > 0 && <span className="count" style={{ background: "var(--warn-bg)", color: "var(--warn)" }}>{s.bugs.length}</span>}
         </button>
       ))}
@@ -114,7 +115,7 @@ export function Inspector() {
               ["dimensiune", `${t.size[sel.index]} B`],
               ["elemente", `${t.content.elements[sel.index]}`],
               ["NaN / zero", `${fmt.pct(t.content.nanRatio[sel.index])} / ${fmt.pct(t.content.zeroRatio[sel.index])}`],
-              ["stare", t.content.decodeError[sel.index] ? "nedecodabil" : t.content.invalid[sel.index] ? "invalid" : t.content.empty[sel.index] ? "gol" : "OK"],
+              ["status", t.content.decodeError[sel.index] ? "undecodable" : t.content.invalid[sel.index] ? "invalid" : t.content.empty[sel.index] ? "empty" : "OK"],
             ]}
           />
           <div className="row" style={{ margin: "8px 0" }}>
@@ -144,23 +145,27 @@ export function CommandPalette() {
   const cmds = useMemo<Cmd[]>(() => {
     const a = s.analysis;
     const list: Cmd[] = [];
-    const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues", "styleguide"];
-    for (const v of views) list.push({ group: "vedere", label: v === "styleguide" ? "Styleguide (design system)" : T.views[v as keyof typeof T.views], run: () => app.set({ view: v }) });
+    const views: ViewName[] = [...visibleViews(), "styleguide"];
+    for (const v of views) list.push({ group: "view", label: v === "styleguide" ? "Styleguide (design system)" : T.views[v as keyof typeof T.views], run: () => app.set({ view: v }) });
     list.push(
-      { group: "acțiune", label: "Redă / pauză", run: togglePlay },
-      { group: "acțiune", label: T.exportPng, run: downloadSnapshot },
-      { group: "acțiune", label: T.exportVideo, run: () => exportVideo() },
-      { group: "acțiune", label: T.createBug, run: () => openBugDraft() },
-      { group: "acțiune", label: T.addNote, run: openNoteDraft },
-      { group: "acțiune", label: "Profil Derivat", run: () => app.set({ profile: "derived" }) },
-      { group: "acțiune", label: "Profil Strict", run: () => app.set({ profile: "strict" }) },
-      { group: "acțiune", label: T.tour, run: () => app.set({ tourStep: 0 }) },
+      { group: "action", label: "Play / pause", run: togglePlay },
+      { group: "action", label: T.exportPng, run: downloadSnapshot },
+      { group: "action", label: T.exportVideo, run: () => exportVideo() },
+      ...(features.issues
+        ? [
+            { group: "action", label: T.createBug, run: () => openBugDraft() },
+            { group: "action", label: T.addNote, run: openNoteDraft },
+          ]
+        : []),
+      { group: "action", label: "Derived profile", run: () => app.set({ profile: "derived" }) },
+      { group: "action", label: "Strict profile", run: () => app.set({ profile: "strict" }) },
+      { group: "action", label: T.tour, run: () => app.set({ tourStep: 0 }) },
       { group: "layout", label: T.layoutReset, run: () => app.set(defaultPanels(app.get().analysis!)) },
     );
     if (a) {
       for (const t of a.topics) list.push({ group: "topic", label: `${t.topic} · ${t.type}`, run: () => { app.set({ view: "inventory" }); } });
-      for (const r of results(s.profile, s)) for (const v of r.violations.slice(0, 20)) list.push({ group: "eșec", label: `${r.id} @ ${fmt.s(v.startNs)} · ${v.topic} · ${v.message}`, run: () => jumpTo(v.startNs, [v.topic]) });
-      for (const rep of s.reports) for (const f of rep.failures.slice(0, 50)) list.push({ group: "raport", label: `${f.requirement} @ ${fmt.s(f.startNs)} · ${f.message}`, run: () => jumpTo(f.startNs, [f.topic]) });
+      if (features.requirements) for (const r of results(s.profile, s)) for (const v of r.violations.slice(0, 20)) list.push({ group: "failure", label: `${r.id} @ ${fmt.s(v.startNs)} · ${v.topic} · ${v.message}`, run: () => jumpTo(v.startNs, [v.topic]) });
+      for (const rep of s.reports) for (const f of rep.failures.slice(0, 50)) list.push({ group: "report", label: `${f.requirement} @ ${fmt.s(f.startNs)} · ${f.message}`, run: () => jumpTo(f.startNs, [f.topic]) });
       for (const b of s.bugs) list.push({ group: "bug", label: b.title, run: () => jumpTo(b.startNs, b.topics) });
     }
     return list;
@@ -169,7 +174,7 @@ export function CommandPalette() {
   const filtered = useMemo(() => {
     const ql = q.toLowerCase();
     const out = cmds.filter((c) => !ql || c.label.toLowerCase().includes(ql) || c.group.includes(ql)).slice(0, 60);
-    if (tq !== undefined && s.analysis) out.unshift({ group: "timp", label: `Salt la ${(tq / 1e9).toFixed(3)} s`, run: () => { setPlaying(false); seek(tq); app.set({ view: "replay" }); } });
+    if (tq !== undefined && s.analysis) out.unshift({ group: "time", label: `Jump to ${(tq / 1e9).toFixed(3)} s`, run: () => { setPlaying(false); seek(tq); app.set({ view: "replay" }); } });
     return out;
   }, [cmds, q, tq, s.analysis]);
   useEffect(() => setSel(0), [q]);
@@ -219,18 +224,18 @@ export function HelpModal() {
   const open = useApp((s) => s.helpOpen);
   if (!open) return null;
   const keys: Array<[string, string]> = [
-    ["Space", "redă / pauză"],
-    ["← / →", "cadrul anterior / următor (topicul de pas sau panourile vizibile)"],
-    ["Shift + ← / →", "±1 secundă"],
-    ["[ / ]", "viteză mai mică / mai mare"],
-    ["Home / End", "început / sfârșit"],
-    ["A / B", "setează cursoarele A / B (măsurare, buclă, export video, bug)"],
-    ["L", "buclă pe A–B"],
-    ["N", "notă la momentul curent"],
+    ["Space", "play / pause"],
+    ["← / →", "previous / next frame (step topic or visible panels)"],
+    ["Shift + ← / →", "±1 second"],
+    ["[ / ]", "slower / faster"],
+    ["Home / End", "start / end"],
+    ["A / B", features.issues ? "set cursors A / B (measurement, loop, video export, bug)" : "set cursors A / B (measurement, loop, video export)"],
+    ["L", "loop over A–B"],
+    ...(features.issues ? ([["N", "note at the current moment"]] as Array<[string, string]>) : []),
     ["I", "inspector"],
-    ["Ctrl/⌘ + K", "paletă de comenzi: topic, timestamp (ex. 12.5s), eșec, comandă"],
-    ["1 … 8", "comută vederile"],
-    ["?", "acest ajutor"],
+    ["Ctrl/⌘ + K", "command palette: topic, timestamp (e.g. 12.5s), failure, command"],
+    [`1 … ${visibleViews().length}`, "switch views"],
+    ["?", "this help"],
   ];
   return (
     <Modal title={tr("Ajutor și scurtături")} onClose={() => app.set({ helpOpen: false })}>
@@ -241,6 +246,10 @@ export function HelpModal() {
       <p className="small">{tr("Timeline: click/drag pentru salt, Ctrl+rotiță zoom, Shift+rotiță deplasare, dublu-click resetare. Panourile se mută din antet și se redimensionează din colț.")}</p>
       <p className="small">{tr("Pe un panou de intrare, selectorul „↔ ieșire” arată exact cadrul de intrare folosit de ieșirea curentă.")}</p>
       <button className="btn" onClick={() => app.set({ helpOpen: false, tourStep: 0 })}>{tr("Pornește turul ghidat")}</button>
+      <hr />
+      <p className="small muted">
+        <b>StampTrace</b> {APP_VERSION} ({GIT_COMMIT}) · {tr("creat de")} <b>{AUTHOR}</b> · {tr("Proiect pentru dotLumen SW Test Challenge — nu este un produs oficial .lumen")}
+      </p>
     </Modal>
   );
 }
@@ -250,7 +259,7 @@ export function SettingsModal() {
   const open = useApp((s) => s.settingsOpen);
   const gap = useApp((s) => s.gapFactor);
   const [hc, setHc] = useState(document.documentElement.dataset.contrast === "high");
-  const [lang, setL] = useState<Lang>((document.documentElement.lang as Lang) === "en" ? "en" : "ro");
+  const [lang, setL] = useState<Lang>((document.documentElement.lang as Lang) === "ro" ? "ro" : "en");
   if (!open) return null;
   return (
     <Modal title={T.settings} onClose={() => app.set({ settingsOpen: false })}>
@@ -275,11 +284,11 @@ export function SettingsModal() {
 }
 
 const TOUR: Array<{ sel: string; title: string; text: string }> = [
-  { sel: "[data-tour=file]", title: "Fișierul analizat", text: "Numele, durata și amprenta SHA-256 — apare în orice export, ca rezultatele să poată fi reproduse exact." },
-  { sel: "[data-tour=nav]", title: "Vederile", text: "Replay, apoi câte o vedere pentru fiecare sub-challenge: inventar (2.1), cauzalitate (2.2), consistență (2.3), cerințe (2.4), siguranță (2.5), bug-uri și note (2.6–2.7)." },
-  { sel: "[data-tour=transport]", title: "Redare sincronizată", text: "Play, pas cadru cu cadru pe un topic, viteze, sursa timpului (log sau header.stamp), cursoare A/B." },
-  { sel: "[data-tour=panels]", title: "Intrări | Ieșiri FOV 1 | Ieșiri FOV 2", text: "Fiecare panou arată mesajul de la momentul curent, vârsta lui și starea (OK / întârziat / expirat / gol / invalid)." },
-  { sel: "[data-tour=timeline]", title: "Timeline", text: "Fiecare mesaj e o bifă; golurile sunt roșii, încălcările cerințelor hașurate, eșecurile din rapoarte marcate cu ▲. Click pentru salt." },
+  { sel: "[data-tour=file]", title: "The analysed file", text: "Name, duration and SHA-256 fingerprint — included in every export so results can be reproduced exactly." },
+  { sel: "[data-tour=nav]", title: "The views", text: features.requirements ? "Replay, then one view per sub-challenge: inventory (2.1), causality (2.2), consistency (2.3), requirements (2.4), safety (2.5), bugs and notes (2.6–2.7)." : "Replay, then the analysis views: inventory (2.1), causality & latency (2.2), content quality and FOV consistency (2.3)." },
+  { sel: "[data-tour=transport]", title: "Synchronised playback", text: "Play, frame-by-frame stepping on a topic, speeds, time source (log or header.stamp), A/B cursors." },
+  { sel: "[data-tour=panels]", title: "Inputs | Outputs FOV 1 | Outputs FOV 2", text: "Each panel shows the message at the current moment, its age and its status (OK / late / stale / empty / invalid)." },
+  { sel: "[data-tour=timeline]", title: "Timeline", text: features.requirements ? "Every message is a tick; gaps are red, requirement violations shaded, report failures marked with ▲. Click to jump." : "Every message is a tick; gaps are red, empty or invalid messages are highlighted. Click to jump." },
 ];
 
 export function Tour() {
@@ -341,7 +350,7 @@ export function useShortcuts(): void {
       const tgt = e.target as HTMLElement;
       if (tgt.closest("input, textarea, select, [contenteditable=true], .modal")) return;
       if (s.phase !== "ready") return;
-      const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues"];
+      const views = visibleViews();
       switch (e.key) {
         case " ":
           if (tgt.tagName === "BUTTON") return;
@@ -384,7 +393,7 @@ export function useShortcuts(): void {
           break;
         case "n":
         case "N":
-          openNoteDraft();
+          if (features.issues) openNoteDraft();
           break;
         case "i":
         case "I":
@@ -394,7 +403,7 @@ export function useShortcuts(): void {
           app.set({ helpOpen: true });
           break;
         default:
-          if (/^[1-8]$/.test(e.key)) app.set({ view: views[+e.key - 1] });
+          if (/^[1-9]$/.test(e.key) && views[+e.key - 1]) app.set({ view: views[+e.key - 1] });
       }
     };
     window.addEventListener("keydown", onKey);

@@ -49,7 +49,7 @@ export async function checkFile(path: string, expected: { records: Rec[] }): Pro
     const b = got.map(key).sort().join("|");
     const counted = analysis.topics.reduce((s, t) => s + t.count, 0);
     const ok = a === b && counted === exp.msgs.length && (exp.metadata === 0 || !opened.indexed || analysis.metadata.length === exp.metadata);
-    return { file: path, ok, indexed: opened.indexed, expected: exp.msgs.length, found: got.length, error: ok ? undefined : `attendu ${a || "∅"} / găsit ${b || "∅"} / analiză ${counted}` };
+    return { file: path, ok, indexed: opened.indexed, expected: exp.msgs.length, found: got.length, error: ok ? undefined : `expected ${a || "∅"} / found ${b || "∅"} / analysis ${counted}` };
   } catch (e) {
     return { file: path, ok: false, indexed: false, expected: exp.msgs.length, found: 0, error: e instanceof Error ? e.message : String(e) };
   }
@@ -72,6 +72,6 @@ if (process.argv[1]?.endsWith("conformance.ts")) {
   const bad = res.filter((r) => !r.ok);
   for (const r of bad) console.log(`FAIL ${r.file}: ${r.error}`);
   const idx = res.filter((r) => r.indexed).length;
-  console.log(`\n${res.length - bad.length}/${res.length} fișiere conforme (${idx} citite indexat, ${res.length - idx} secvențial)`);
+  console.log(`\n${res.length - bad.length}/${res.length} files conform (${idx} read indexed, ${res.length - idx} sequentially)`);
   process.exit(bad.length ? 1 : 0);
 }

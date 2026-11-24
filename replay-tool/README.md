@@ -1,8 +1,10 @@
-# .lumen Replay
+# StampTrace
+
+**Synchronised replay & test analysis for MCAP recordings** · autor: **Calin Pantis**
 
 Aplicație web de **replay sincronizat** pentru înregistrările ROS 2 (MCAP) ale Ochelarilor .lumen. Răspunde la sub-challenge-ul 2.8 din *dotLumen SW Test Challenge v4* și este, în același timp, instrumentul de analiză pentru 2.1–2.7: orice afirmație din document poate fi dovedită cu o măsurătoare din aplicație.
 
-![Replay — temă închisă](docs/screenshots/replay-dark.png)
+![StampTrace — temă închisă](docs/screenshots/replay-dark.png)
 
 ## Pornire rapidă
 
@@ -22,7 +24,7 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 | `npm run build` | site static în `dist/` (typecheck + Vite) |
 | `npm test` | 49 de teste unitare, de integrare și de compatibilitate (Vitest) |
 | `npm run conformance` | cele 416 fișiere oficiale de conformitate MCAP |
-| `npm run test:e2e` | 15 teste Playwright: fluxurile principale, fiecare export (PNG, WebM, CSV, Markdown, raport JSON, ZIP de bug-uri), modul telefon, interfața EN și audit de accesibilitate axe-core în ambele teme |
+| `npm run test:e2e` | 16 teste Playwright: fluxurile principale, fiecare export (PNG, WebM, CSV, Markdown, raport JSON, ZIP de bug-uri), modul telefon, interfața EN și audit de accesibilitate axe-core în ambele teme |
 | `npm run test:all` | typecheck + unit + build + e2e |
 | `npm run inspect -- fișier.mcap [--schemas]` | inspectează o înregistrare reală: topicuri, tipuri, scheme, statistici, cauzalitate |
 | `npm run metrics -- fișier.mcap --out out/` | `metrics.json`, `report-derived.json`, `report-strict.json`; codul de ieșire e 1 dacă profilul derivat are eșecuri |
@@ -31,7 +33,7 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 Cu Docker:
 
 ```bash
-docker build -t lumen-replay . && docker run --rm -p 8080:80 lumen-replay
+docker build -t stamptrace . && docker run --rm -p 8080:80 stamptrace
 ```
 
 ## Publicare pe Vercel
@@ -150,9 +152,17 @@ Defectele injectate, pe care testele verifică faptul că aplicația le găseșt
 
 Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←/→` cu ±1 s, `[ ]` schimbă viteza, `A/B` pun cursoarele, `L` pornește bucla, `N` adaugă o notă, `I` deschide inspectorul, `Ctrl/⌘+K` paleta de comenzi, `1–8` comută vederile, `?` deschide ajutorul.
 
+## Livrare în etape (feature flags)
+
+Prima livrare include Replay și vederile de analiză: Inventory, Causality & latency, Content quality, FOV consistency. Vederile **Requirements & tests**, **Safety** și **Bugs & notes** (cu butoanele Bug/notă, hașurile de încălcare de pe timeline și badge-ul FAIL) sunt implementate și testate, dar ascunse.
+
+- Pentru a le livra: `true` în `DEFAULT_FEATURES` din `src/state/features.ts`.
+- Pentru a le vedea intern, fără release: deschide aplicația cu `?features=all` (reținut în browser); `?features=default` revine.
+- Evaluarea cerințelor rămâne disponibilă din linia de comandă: `npm run metrics -- fișier.mcap`.
+
 ## Interfață, performanță, confidențialitate
 
-- **Limbă:** română (implicit) sau engleză, din Setări. Traducerile sunt în `src/i18n/en.ts`. Dovezile generate de analiză (motivele clasificării, mesajele de încălcare) rămân în română.
+- **Limbă:** engleză (implicit) sau română, din Setări. Analiza, rapoartele, exporturile și CLI-ul sunt în engleză; varianta română a interfeței folosește `src/i18n` (textele generate de analiză rămân în engleză).
 - **Tabletă și telefon** (≤ 900 px): replay-ul afișează un singur panou, cu selector, și o singură coloană care se derulează vertical.
 - **Încărcare:** vederile, three.js și uPlot se încarcă la nevoie; codul inițial are ~125 KB comprimat.
 - **Fără cereri către terți:** fonturile Poppins și JetBrains Mono sunt incluse în aplicație (`@fontsource`, cu subsetul latin-ext pentru ă, ș, ț). `vercel.json` setează o politică CSP care permite doar resursele proprii.
@@ -177,3 +187,7 @@ Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←
 | ![](docs/screenshots/requirements-dark.png) | ![](docs/screenshots/safety-dark.png) |
 
 Paragraful pentru secțiunea „Implementation” a documentului challenge-ului se află în [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+## Autor
+
+**Calin Pantis** — proiectat și dezvoltat pentru *dotLumen SW Test Challenge v4* (sub-challenge 2.8 și instrumentele de analiză pentru 2.1–2.7). StampTrace nu este un produs oficial .lumen; stilul vizual este inspirat de identitatea .lumen.

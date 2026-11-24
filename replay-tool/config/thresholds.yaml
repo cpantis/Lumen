@@ -1,4 +1,4 @@
-# .lumen Replay — single source of truth for requirement thresholds.
+# StampTrace — single source of truth for requirement thresholds.
 #
 # The same file is read by the web app (Requirements view, threshold lines on plots,
 # violation shading on the timeline) and by the CLI (`npm run metrics -- file.mcap`),
@@ -28,166 +28,166 @@ assumptions:
 
 requirements:
   - id: REQ-IN-01
-    title: Intrările de cameră sunt publicate la o frecvență constantă
-    title_en: Camera inputs are published at a constant rate
+    title: Camera inputs are published at a constant rate
+    title_ro: Intrările de cameră sunt publicate la o frecvență constantă
     kind: rate_min
     select: { role: input, type: "Image|CompressedImage" }
     safety: true
-    verification: Analiză automată — rata pe fereastră glisantă de 1 s, evaluată la fiecare mesaj
-    rationale: Fără cadre de intrare, componenta nu are ce procesa; orice scădere se propagă la ieșiri.
+    verification: Automatic analysis — rate over a 1 s sliding window, evaluated at every message
+    rationale: Without input frames the component has nothing to process; any drop propagates to the outputs.
     derived: { min_hz: 10, window_s: 1 }
     strict: { min_hz: 15, window_s: 1 }
 
   - id: REQ-OUT-01
-    title: Fiecare ieșire este publicată cu o frecvență minimă
-    title_en: Every output is published at a minimum rate
+    title: Every output is published at a minimum rate
+    title_ro: Fiecare ieșire este publicată cu o frecvență minimă
     kind: rate_min
     select: { role: output }
     safety: true
-    verification: Analiză automată — rata pe fereastră glisantă de 1 s
-    rationale: La 1,4 m/s, fiecare 100 ms fără ieșire înseamnă 14 cm parcurși fără informație nouă.
+    verification: Automatic analysis — rate over a 1 s sliding window
+    rationale: At 1.4 m/s, every 100 ms without output means 14 cm walked without new information.
     derived: { min_hz: 5, window_s: 1 }
     strict: { min_hz: 10, window_s: 1 }
 
   - id: REQ-OUT-02
-    title: Niciun gol între două ieșiri consecutive nu depășește limita
-    title_en: No gap between two consecutive outputs exceeds the limit
+    title: No gap between two consecutive outputs exceeds the limit
+    title_ro: Niciun gol între două ieșiri consecutive nu depășește limita
     kind: gap_max
     select: { role: output }
     safety: true
-    verification: Analiză automată — intervalul dintre mesaje consecutive
-    rationale: Golul maxim este timpul în care utilizatorul merge "orb"; 300 ms ≈ 42 cm la 1,4 m/s.
+    verification: Automatic analysis — interval between consecutive messages
+    rationale: The maximum gap is the time the user walks "blind"; 300 ms ≈ 42 cm at 1.4 m/s.
     derived: { max_ms: 500 }
     strict: { max_ms: 200 }
 
   - id: REQ-LAT-01
-    title: Latența cap-coadă (stamp intrare → publicare ieșire) este limitată
-    title_en: End-to-end latency (input stamp → output publication) is bounded
+    title: End-to-end latency (input stamp → output publication) is bounded
+    title_ro: Latența cap-coadă (stamp intrare → publicare ieșire) este limitată
     kind: latency
     select: { role: output }
     safety: true
-    verification: Analiză automată — log_time(ieșire) − header.stamp(intrare potrivită exact)
-    rationale: Un obstacol e raportat din poziția de acum `latență` secunde; 150 ms ≈ 21 cm.
+    verification: Automatic analysis — log_time(output) − header.stamp(exactly matched input)
+    rationale: An obstacle is reported from where the user was `latency` seconds ago; 150 ms ≈ 21 cm.
     derived: { p95_ms: 250, max_ms: 400 }
     strict: { p95_ms: 100, max_ms: 150 }
 
   - id: REQ-TRACE-01
-    title: Fiecare ieșire poartă stamp-ul cadrului de intrare din care provine
-    title_en: Every output carries the stamp of the input frame it was produced from
+    title: Every output carries the stamp of the input frame it was produced from
+    title_ro: Fiecare ieșire poartă stamp-ul cadrului de intrare din care provine
     kind: match_min
     select: { role: output }
     safety: false
-    verification: Analiză automată — potrivire exactă de header.stamp cu o intrare
-    rationale: Fără trasabilitate, latența și consistența nu pot fi verificate.
+    verification: Automatic analysis — exact header.stamp match with an input
+    rationale: Without traceability, latency and consistency cannot be verified.
     derived: { min_ratio: 0.95 }
     strict: { min_ratio: 1.0 }
 
   - id: REQ-DROP-01
-    title: Componenta nu sare cadre de intrare
-    title_en: The component does not skip input frames
+    title: The component does not skip input frames
+    title_ro: Componenta nu sare cadre de intrare
     kind: drop_max
     select: { role: output }
     safety: true
-    verification: Analiză automată — cadre de intrare fără nicio ieșire cu același stamp
-    rationale: Secvențele lungi de cadre sărite sunt goluri de percepție.
+    verification: Automatic analysis — input frames without any output carrying the same stamp
+    rationale: Long runs of skipped frames are perception gaps.
     derived: { max_ratio: 0.2, max_run: 5 }
     strict: { max_ratio: 0.05, max_run: 2 }
 
   - id: REQ-CONT-01
-    title: Ieșirile nu sunt goale
-    title_en: Outputs are not empty
+    title: Outputs are not empty
+    title_ro: Ieșirile nu sunt goale
     kind: empty_max
     select: { role: output }
     safety: true
-    verification: Analiză automată — mesaje cu 0 puncte / 0 pixeli / payload gol
-    rationale: Un mesaj gol poate fi interpretat ca "drum liber".
+    verification: Automatic analysis — messages with 0 points / 0 pixels / empty payload
+    rationale: An empty message may be interpreted as "path clear".
     derived: { max_ratio: 0.02 }
     strict: { max_ratio: 0.0 }
 
   - id: REQ-CONT-02
-    title: Mesajele sunt valide structural și decodabile
-    title_en: Messages are structurally valid and decodable
+    title: Messages are structurally valid and decodable
+    title_ro: Mesajele sunt valide structural și decodabile
     kind: invalid_max
     select: {}
     safety: true
-    verification: Analiză automată — decodare CDR + verificări de structură (lungime date, NaN în IMU)
-    rationale: Un mesaj corupt e la fel de periculos ca unul lipsă, dar mai greu de detectat.
+    verification: Automatic analysis — decoding + structural checks (data length, NaN in IMU)
+    rationale: A corrupt message is as dangerous as a missing one, but harder to detect.
     derived: { max_ratio: 0.0 }
     strict: { max_ratio: 0.0 }
 
   - id: REQ-CONT-03
-    title: Proporția de valori NaN/Inf per mesaj de ieșire este limitată
-    title_en: The NaN/Inf ratio per output message is bounded
+    title: The NaN/Inf ratio per output message is bounded
+    title_ro: Proporția de valori NaN/Inf per mesaj de ieșire este limitată
     kind: nan_max
     select: { role: output }
     safety: false
-    verification: Analiză automată — NaN/Inf per mesaj
-    rationale: NaN-urile reduc acoperirea; peste prag, zona nu mai poate fi considerată percepută.
+    verification: Automatic analysis — NaN/Inf per message
+    rationale: NaNs reduce coverage; above the threshold the area can no longer be considered perceived.
     derived: { max_ratio: 0.5 }
     strict: { max_ratio: 0.2 }
 
   - id: REQ-CONT-04
-    title: Acoperirea (valori valide) per mesaj de ieșire este suficientă
-    title_en: Coverage (valid values) per output message is sufficient
+    title: Coverage (valid values) per output message is sufficient
+    title_ro: Acoperirea (valori valide) per mesaj de ieșire este suficientă
     kind: valid_min
     select: { role: output }
     safety: true
-    verification: Analiză automată — 1 − NaN − zero, per mesaj
-    rationale: Un mesaj cu 10% valori valide arată aproape nimic din scenă.
+    verification: Automatic analysis — 1 − NaN − zero, per message
+    rationale: A message with 10% valid values shows almost nothing of the scene.
     derived: { min_ratio: 0.3 }
     strict: { min_ratio: 0.6 }
 
   - id: REQ-CONT-05
-    title: Valorile sunt în intervale fizic plauzibile
-    title_en: Values are within physically plausible ranges
+    title: Values are within physically plausible ranges
+    title_ro: Valorile sunt în intervale fizic plauzibile
     kind: out_of_range_max
     select: {}
     safety: false
-    verification: Analiză automată — valori finite în afara plausible_ranges
-    rationale: Distanțe de 300 m sau accelerații de 200 m/s² indică erori de calcul sau de senzor.
+    verification: Automatic analysis — finite values outside plausible_ranges
+    rationale: Distances of 300 m or accelerations of 200 m/s² indicate computation or sensor errors.
     derived: { max_ratio: 0.05 }
     strict: { max_ratio: 0.01 }
 
   - id: REQ-CONT-06
-    title: Ieșirile nu îngheață (cadre identice repetate)
-    title_en: Outputs do not freeze (identical repeated frames)
+    title: Outputs do not freeze (identical repeated frames)
+    title_ro: Ieșirile nu îngheață (cadre identice repetate)
     kind: duplicate_max
     select: { role: output }
     safety: true
-    verification: Analiză automată — hash de conținut identic cu mesajul anterior
-    rationale: O ieșire înghețată pare validă, dar descrie o scenă veche.
+    verification: Automatic analysis — content hash identical to the previous message
+    rationale: A frozen output looks valid but describes an old scene.
     derived: { max_ratio: 0.05, max_run: 3 }
     strict: { max_ratio: 0.0, max_run: 1 }
 
   - id: REQ-CLK-01
-    title: header.stamp este monoton crescător și nu vine din viitor
-    title_en: header.stamp is monotonically increasing and not in the future
+    title: header.stamp is monotonically increasing and not in the future
+    title_ro: header.stamp este monoton crescător și nu vine din viitor
     kind: stamp_monotonic
     select: {}
     safety: false
-    verification: Analiză automată — stamp[i] ≥ stamp[i−1] și stamp ≤ log_time
-    rationale: Stamp-urile greșite invalidează sincronizarea și măsurarea latenței.
+    verification: Automatic analysis — stamp[i] ≥ stamp[i−1] and stamp ≤ log_time
+    rationale: Wrong stamps invalidate synchronisation and latency measurement.
     derived: { allow_duplicates: true }
     strict: { allow_duplicates: false }
 
   - id: REQ-CLK-02
-    title: Întârzierea de transport a intrărilor (log_time − stamp) este limitată
-    title_en: Input transport delay (log_time − stamp) is bounded
+    title: Input transport delay (log_time − stamp) is bounded
+    title_ro: Întârzierea de transport a intrărilor (log_time − stamp) este limitată
     kind: clock_offset_max
     select: { role: input }
     safety: false
-    verification: Analiză automată — percentila 95 a log_time − header.stamp
-    rationale: Contribuie direct la latența totală percepută de utilizator.
+    verification: Automatic analysis — 95th percentile of log_time − header.stamp
+    rationale: Contributes directly to the total latency experienced by the user.
     derived: { p95_ms: 100 }
     strict: { p95_ms: 30 }
 
   - id: REQ-FOV-01
-    title: Ieșirile aceluiași FOV descriu același moment și apar împreună
-    title_en: Outputs of the same FOV describe the same moment and appear together
+    title: Outputs of the same FOV describe the same moment and appear together
+    title_ro: Ieșirile aceluiași FOV descriu același moment și apar împreună
     kind: fov_sync
     select: {}
     safety: false
-    verification: Analiză automată — grupare după stamp; toate ieșirile prezente, decalaj de publicare limitat
-    rationale: Ieșiri inconsistente în timp pot descrie scene diferite (2.3).
+    verification: Automatic analysis — grouping by stamp; all outputs present, bounded publication spread
+    rationale: Outputs inconsistent in time may describe different scenes (2.3).
     derived: { min_complete_ratio: 0.9, max_spread_ms: 50 }
     strict: { min_complete_ratio: 0.99, max_spread_ms: 10 }

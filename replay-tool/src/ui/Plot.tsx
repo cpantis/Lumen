@@ -189,7 +189,7 @@ export function Plot(props: PlotProps) {
           )}
         </figcaption>
       )}
-      <div ref={wrap} role="img" aria-label={`${props.title ?? "grafic"}: ${props.series.map((s) => s.label).join(", ")}`} />
+      <div ref={wrap} role="img" aria-label={`${props.title ?? "plot"}: ${props.series.map((s) => s.label).join(", ")}`} />
     </figure>
   );
 }

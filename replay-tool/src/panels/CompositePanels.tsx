@@ -76,15 +76,15 @@ export function OverlayPanel({ cfg, topic, cloud }: { cfg: PanelConfig; topic: T
       cfg={cfg}
       topic={cloud ?? topic}
       index={ci}
-      title={`Proiecție ${cloud?.topic ?? "?"} → ${topic.topic}`}
+      title={`Projection ${cloud?.topic ?? "?"} → ${topic.topic}`}
       toolbar={<input type="range" min={0.1} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(+e.target.value)} aria-label={tr("Opacitate puncte")} data-tip={tr("Opacitatea punctelor proiectate")} style={{ width: 60 }} />}
       footer={
         <>
-          <span data-tip={cal?.note}>calibrare: {cal?.source ?? "…"}</span>
-          {metric && <span>în imagine {fmt.pct(metric.inImageRatio)}</span>}
+          <span data-tip={cal?.note}>calibration: {cal?.source ?? "…"}</span>
+          {metric && <span>in image {fmt.pct(metric.inImageRatio)}</span>}
           {metric && Number.isFinite(metric.medianRelError) && (
-            <span style={{ color: metric.medianRelError > 0.05 ? "var(--error)" : "var(--ok)" }} data-tip={`Eroare relativă mediană |Z_nor − Z_adâncime| / Z_adâncime pe ${metric.compared} pixeli comuni`}>
-              eroare adâncime med. {fmt.pct(metric.medianRelError)} (p90 {fmt.pct(metric.p90RelError)})
+            <span style={{ color: metric.medianRelError > 0.05 ? "var(--error)" : "var(--ok)" }} data-tip={`Median relative error |Z_cloud − Z_depth| / Z_depth over ${metric.compared} common pixels`}>
+              median depth error {fmt.pct(metric.medianRelError)} (p90 {fmt.pct(metric.p90RelError)})
             </span>
           )}
           <button className="btn sm ghost" onClick={() => app.set({ view: "consistency" })}>
@@ -138,7 +138,7 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
           out[o + 2] = b;
         }
       drawImageFit(c, { rgba: out, width: w, height: h });
-      setStat(`diferență relativă medie ${fmt.pct(n ? sum / n : NaN)} pe ${n} pixeli`);
+      setStat(`mean relative difference ${fmt.pct(n ? sum / n : NaN)} over ${n} pixels`);
     } else {
       const g = drawImageFit(c, ma);
       if (g && mb && (mb.rgba || mb.bitmap)) {
@@ -149,7 +149,7 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
         ctx.drawImage(mb.bitmap ?? off, g.ox, g.oy, ma.width! * g.scale, ma.height! * g.scale);
         ctx.globalAlpha = 1;
       }
-      setStat(mode === "diff" ? "geometrii diferite: harta de diferențe nu e disponibilă" : "");
+      setStat(mode === "diff" ? "different geometries: difference map not available" : "");
     }
   }, [ma, mb, mode, opacity]);
 
@@ -158,7 +158,7 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
       cfg={cfg}
       topic={ta}
       index={ia}
-      title={`Comparație ${ta.topic} ⇄ ${tb?.topic ?? "?"}`}
+      title={`Comparison ${ta.topic} ⇄ ${tb?.topic ?? "?"}`}
       toolbar={
         <>
           <div className="btn-group">
@@ -172,7 +172,7 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
           {mode === "overlay" && <input type="range" min={0} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(+e.target.value)} aria-label={tr("Transparență imagine B")} style={{ width: 60 }} />}
         </>
       }
-      footer={<span>{ib < 0 ? "B: niciun mesaj cu același stamp" : stat}</span>}
+      footer={<span>{ib < 0 ? "B: no message with the same stamp" : stat}</span>}
     >
       <canvas ref={canvas} role="img" aria-label={tr("Comparație între două ieșiri")} />
     </PanelFrame>

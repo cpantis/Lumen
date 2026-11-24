@@ -10,6 +10,7 @@ import type { TopicData } from "../core/types";
 import { effectiveFov, effectiveRole, fovList, results, seek, setPlaying, topicColor } from "../state/actions";
 import { app, clock, useApp, useClock } from "../state/store";
 import { fmtRelS } from "../core/time";
+import { features } from "../state/features";
 import { lastAtOrBefore } from "../core/sync";
 import { detectGaps } from "../core/stats";
 import { tr } from "../i18n";
@@ -47,7 +48,7 @@ export function Timeline() {
   }, [a, s.roleOverrides, s.fovOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gapsByTopic = useMemo(() => new Map(a.topics.map((t) => [t.topic, detectGaps(t.log, s.gapFactor, t.rate.medianPeriodNs)])), [a, s.gapFactor]);
-  const violations = useMemo(() => results(s.profile, s).flatMap((r) => r.violations), [s.profile, s.analysis, s.thresholdsText, s.roleOverrides, s.fovOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  const violations = useMemo(() => (features.requirements ? results(s.profile, s).flatMap((r) => r.violations) : []), [s.profile, s.analysis, s.thresholdsText, s.roleOverrides, s.fovOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const reportFailures = useMemo(() => (s.showReportMarkers ? s.reports.flatMap((r) => r.failures.map((f) => ({ ...f, report: r.name }))) : []), [s.reports, s.showReportMarkers]);
 
   const height = AXIS_H + MARK_H + rows.length * ROW_H + 4;
@@ -91,7 +92,7 @@ export function Timeline() {
     // marker row: report failures, bugs, notes
     const my = AXIS_H;
     ctx.fillStyle = muted;
-    ctx.fillText("rapoarte · bug-uri · note", 8, my + 11);
+    if (features.requirements || features.issues) ctx.fillText(features.issues ? "reports · bugs · notes" : "reports", 8, my + 11);
     for (const f of reportFailures) {
       const x = xOf(f.startNs);
       if (x < LABEL_W || x > LABEL_W + plotW) continue;
@@ -225,11 +226,11 @@ export function Timeline() {
     const topic = rows[r];
     if (!topic) return "";
     const g = (gapsByTopic.get(topic.topic) ?? []).find((x) => t >= x.startNs && t <= x.endNs);
-    if (g) return `${topic.topic}: gol de ${(g.durationNs / 1e6).toFixed(0)} ms (${fmtRelS(g.startNs)} → ${fmtRelS(g.endNs)})`;
+    if (g) return `${topic.topic}: gap of ${(g.durationNs / 1e6).toFixed(0)} ms (${fmtRelS(g.startNs)} → ${fmtRelS(g.endNs)})`;
     const v = violations.find((x) => (x.topic === topic.topic || x.topic.endsWith(` → ${topic.topic}`)) && t >= x.startNs - 2e7 && t <= x.endNs + 2e7);
     if (v) return `${v.requirement}: ${v.message}`;
     const i = lastAtOrBefore(topic.log, t);
-    return `${topic.topic} · ${fmtRelS(t)} · mesaj ${i + 1}/${topic.count}${i >= 0 && topic.content.empty[i] ? " · GOL" : ""}`;
+    return `${topic.topic} · ${fmtRelS(t)} · message ${i + 1}/${topic.count}${i >= 0 && topic.content.empty[i] ? " · EMPTY" : ""}`;
   };
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>, kind: "down" | "move" | "up") => {
@@ -280,7 +281,7 @@ export function Timeline() {
           aria-valuemin={0}
           aria-valuemax={Math.round(a.durationNs / 1e6)}
           aria-valuenow={Math.round(cursor / 1e6)}
-          aria-valuetext={`${(cursor / 1e9).toFixed(1).replace(".", ",")} secunde din ${(a.durationNs / 1e9).toFixed(0)}`}
+          aria-valuetext={`${(cursor / 1e9).toFixed(1)} seconds of ${(a.durationNs / 1e9).toFixed(0)}`}
           onPointerDown={(e) => onPointer(e, "down")}
           onPointerMove={(e) => onPointer(e, "move")}
           onPointerUp={(e) => onPointer(e, "up")}
@@ -296,13 +297,13 @@ export function Timeline() {
         <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {tr("intrări")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {tr("ieșiri FOV 1")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> {tr("ieșiri FOV 2")}</span>
-        <span><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gol (&gt; {s.gapFactor}× perioada)</span>
-        <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> {tr("mesaj gol / bug")}</span>
-        <span><i style={{ display: "inline-block", width: 14, height: 10, background: "var(--error)", opacity: 0.3 }} /> încălcare cerință ({s.profile === "strict" ? "Strict" : "Derivat"})</span>
-        <span>{tr("▲ eșec din raport importat")}</span>
+        <span><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gap (&gt; {s.gapFactor}× period)</span>
+        <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> {features.issues ? tr("mesaj gol / bug") : "empty message"}</span>
+        {features.requirements && <span><i style={{ display: "inline-block", width: 14, height: 10, background: "var(--error)", opacity: 0.3 }} /> requirement violation ({s.profile === "strict" ? "Strict" : "Derived"})</span>}
+        {features.requirements && <span>{tr("▲ eșec din raport importat")}</span>}
         <span className="spacer" />
         <span>
-          {view[0] > 0 || view[1] < a.durationNs ? `zoom ${fmtRelS(view[0], 1)}–${fmtRelS(view[1], 1)} · ` : ""}Ctrl+rotiță zoom · Shift+rotiță deplasare · dublu-click resetare
+          {view[0] > 0 || view[1] < a.durationNs ? `zoom ${fmtRelS(view[0], 1)}–${fmtRelS(view[1], 1)} · ` : ""}Ctrl+wheel zoom · Shift+wheel pan · double-click reset
         </span>
       </div>
       {hover?.text && (

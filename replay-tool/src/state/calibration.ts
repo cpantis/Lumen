@@ -52,11 +52,11 @@ export async function autoCalibration(a: Analysis, ft: FovTopics): Promise<Calib
   if (ft.cameraInfo && ft.cameraInfo.count) {
     const ci = (await worker.get(ft.cameraInfo.topic, 0)).msg as { width: number; height: number; k: ArrayLike<number> };
     intr = intrinsicsFromCameraInfo(ci);
-    note += `Intrinseci din ${ft.cameraInfo.topic}. `;
+    note += `Intrinsics from ${ft.cameraInfo.topic}. `;
   } else {
-    const [w, h] = (ft.image?.details["rezoluție"] ?? "640×480").split("×").map(Number);
+    const [w, h] = (ft.image?.details["resolution"] ?? "640×480").split("×").map(Number);
     intr = assumedIntrinsics(w, h, 90);
-    note += "Fără CameraInfo: intrinseci presupuse (HFOV 90°, punct principal în centru). ";
+    note += "No CameraInfo: assumed intrinsics (HFOV 90°, principal point at the centre). ";
   }
   const camFrame = ft.image?.frameIds[0] ?? ft.depth?.frameIds[0];
   const cloudFrame = ft.cloud?.frameIds[0];
@@ -68,11 +68,11 @@ export async function autoCalibration(a: Analysis, ft: FovTopics): Promise<Calib
     if (tf) {
       ext = extrinsicsFromTf(tf);
       source = ft.cameraInfo ? "camera_info+tf" : "assumed";
-      note += `Extrinseci din TF: poziția ${camFrame} în ${cloudFrame}.`;
+      note += `Extrinsics from TF: pose of ${camFrame} in ${cloudFrame}.`;
     } else if (!/optical/.test(cloudFrame)) {
       ext = { ...ext, roll: -Math.PI / 2, yaw: -Math.PI / 2 };
-      note += `Fără TF între ${cloudFrame} și ${camFrame}: se presupune convenția link→optical (roll −90°, yaw −90°), translație 0.`;
-    } else note += "Norul e deja în frame optic: extrinseci identitate.";
+      note += `No TF between ${cloudFrame} and ${camFrame}: link→optical convention assumed (roll −90°, yaw −90°), zero translation.`;
+    } else note += "The cloud is already in an optical frame: identity extrinsics.";
   }
   return { intrinsics: intr, extrinsics: ext, source, note: note.trim() };
 }

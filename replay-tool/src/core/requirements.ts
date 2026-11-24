@@ -23,9 +23,10 @@ export interface Selector {
 
 export interface RequirementDef {
   id: string;
+  /** English title (default UI language) */
   title: string;
-  /** optional English title (UI language EN) */
-  title_en?: string;
+  /** optional Romanian title (UI language RO) */
+  title_ro?: string;
   kind: string;
   select: Selector;
   safety: boolean;
@@ -67,7 +68,7 @@ export interface TopicVerdict {
 export interface RequirementResult {
   id: string;
   title: string;
-  title_en?: string;
+  title_ro?: string;
   kind: string;
   safety: boolean;
   verification: string;
@@ -81,7 +82,7 @@ export interface RequirementResult {
 
 export function parseThresholds(text: string): ThresholdsConfig {
   const cfg = yaml.load(text) as ThresholdsConfig;
-  if (!cfg || !Array.isArray(cfg.requirements)) throw new Error("Fișier de praguri invalid: lipsește lista `requirements`.");
+  if (!cfg || !Array.isArray(cfg.requirements)) throw new Error("Invalid thresholds file: the `requirements` list is missing.");
   for (const r of cfg.requirements) r.select ??= {};
   return cfg;
 }
@@ -143,13 +144,13 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
         for (let i = 0; i < r.t.length; i++) if (r.t[i] >= startOk) worst = Math.min(worst, r.hz[i]);
         // also detect gaps longer than the window (no message → no evaluation point)
         for (let i = 1; i < t.count; i++) if (t.log[i] - t.log[i - 1] > win) worst = Math.min(worst, NS_PER_S / (t.log[i] - t.log[i - 1]));
-        for (const g of runs(t, bad)) V(t.topic, g.s - win, g.e, Math.min(...Array.from(r.hz.subarray(g.i0, g.i1 + 1))), min, "Hz", `rata pe ${win / NS_PER_S} s a scăzut sub ${min} Hz`);
+        for (const g of runs(t, bad)) V(t.topic, g.s - win, g.e, Math.min(...Array.from(r.hz.subarray(g.i0, g.i1 + 1))), min, "Hz", `rate over ${win / NS_PER_S} s dropped below ${min} Hz`);
         for (let i = 1; i < t.count; i++) {
           const d = t.log[i] - t.log[i - 1];
-          if (d > win) V(t.topic, t.log[i - 1], t.log[i], NS_PER_S / d, min, "Hz", `niciun mesaj timp de ${(d / NS_PER_MS).toFixed(0)} ms`);
+          if (d > win) V(t.topic, t.log[i - 1], t.log[i], NS_PER_S / d, min, "Hz", `no message for ${(d / NS_PER_MS).toFixed(0)} ms`);
         }
         if (!Number.isFinite(worst)) worst = t.rate.meanHz;
-        perTopic.push({ topic: t.topic, verdict: worst >= min ? "PASS" : "FAIL", measured: worst, limit: min, unit: "Hz", note: `medie ${t.rate.meanHz.toFixed(2)} Hz` });
+        perTopic.push({ topic: t.topic, verdict: worst >= min ? "PASS" : "FAIL", measured: worst, limit: min, unit: "Hz", note: `mean ${t.rate.meanHz.toFixed(2)} Hz` });
       }
       break;
     }
@@ -158,7 +159,7 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
       for (const t of topics) {
         for (let i = 1; i < t.count; i++) {
           const d = t.log[i] - t.log[i - 1];
-          if (d > max) V(t.topic, t.log[i - 1], t.log[i], d / NS_PER_MS, max / NS_PER_MS, "ms", `gol de ${(d / NS_PER_MS).toFixed(1)} ms (+${((d - max) / NS_PER_MS).toFixed(1)} ms peste limită)`);
+          if (d > max) V(t.topic, t.log[i - 1], t.log[i], d / NS_PER_MS, max / NS_PER_MS, "ms", `gap of ${(d / NS_PER_MS).toFixed(1)} ms (+${((d - max) / NS_PER_MS).toFixed(1)} ms over the limit)`);
         }
         perTopic.push({ topic: t.topic, verdict: t.rate.maxGapNs <= max ? "PASS" : "FAIL", measured: t.rate.maxGapNs / NS_PER_MS, limit: max / NS_PER_MS, unit: "ms" });
       }
@@ -174,10 +175,10 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
         const bad = (i: number) => e.latency[i] > maxL;
         for (const g of runs(t, bad)) {
           const worst = Math.max(...Array.from(e.latency.subarray(g.i0, g.i1 + 1)));
-          V(t.topic, g.s, g.e, worst / NS_PER_MS, maxL / NS_PER_MS, "ms", `latență ${(worst / NS_PER_MS).toFixed(1)} ms față de ${e.input} (+${((worst - maxL) / NS_PER_MS).toFixed(1)} ms)`);
+          V(t.topic, g.s, g.e, worst / NS_PER_MS, maxL / NS_PER_MS, "ms", `latency ${(worst / NS_PER_MS).toFixed(1)} ms vs ${e.input} (+${((worst - maxL) / NS_PER_MS).toFixed(1)} ms)`);
         }
         const ok = s.p95 <= p95 && s.max <= maxL;
-        perTopic.push({ topic: `${e.input} → ${e.output}`, verdict: ok ? "PASS" : "FAIL", measured: s.p95 / NS_PER_MS, limit: p95 / NS_PER_MS, unit: "ms (p95)", note: `max ${(s.max / NS_PER_MS).toFixed(1)} ms (limită ${maxL / NS_PER_MS} ms), p50 ${(s.p50 / NS_PER_MS).toFixed(1)} ms` });
+        perTopic.push({ topic: `${e.input} → ${e.output}`, verdict: ok ? "PASS" : "FAIL", measured: s.p95 / NS_PER_MS, limit: p95 / NS_PER_MS, unit: "ms (p95)", note: `max ${(s.max / NS_PER_MS).toFixed(1)} ms (limit ${maxL / NS_PER_MS} ms), p50 ${(s.p50 / NS_PER_MS).toFixed(1)} ms` });
       }
       break;
     }
@@ -185,13 +186,13 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
       const min = num(p.min_ratio);
       for (const t of topics) {
         if (!t.hasHeader) {
-          perTopic.push({ topic: t.topic, verdict: "N/A", measured: NaN, limit: min, unit: "raport", note: "fără std_msgs/Header — trasabilitatea nu poate fi verificată" });
+          perTopic.push({ topic: t.topic, verdict: "N/A", measured: NaN, limit: min, unit: "ratio", note: "no std_msgs/Header — traceability cannot be verified" });
           continue;
         }
         const best = a.edges.filter((e) => e.output === t.topic && e.kind === "exact").sort((x, y) => y.matchRate - x.matchRate)[0];
         const rate = best?.matchRate ?? 0;
-        if (best) for (const g of runs(t, (i) => best.inputIndex[i] < 0)) V(t.topic, g.s, g.e, g.i1 - g.i0 + 1, 0, "mesaje", `${g.i1 - g.i0 + 1} ieșiri fără stamp de intrare corespunzător`);
-        perTopic.push({ topic: t.topic, verdict: rate >= min ? "PASS" : "FAIL", measured: rate, limit: min, unit: "raport", note: best ? `față de ${best.input}` : "nicio intrare cu stamp identic" });
+        if (best) for (const g of runs(t, (i) => best.inputIndex[i] < 0)) V(t.topic, g.s, g.e, g.i1 - g.i0 + 1, 0, "messages", `${g.i1 - g.i0 + 1} outputs without a matching input stamp`);
+        perTopic.push({ topic: t.topic, verdict: rate >= min ? "PASS" : "FAIL", measured: rate, limit: min, unit: "ratio", note: best ? `vs ${best.input}` : "no input with an identical stamp" });
       }
       break;
     }
@@ -203,10 +204,10 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
         let longest = 0;
         for (const [s, en, len] of e.dropRuns) {
           longest = Math.max(longest, len);
-          if (len > maxRun) V(e.output, s, en, len, maxRun, "cadre", `${len} cadre consecutive din ${e.input} fără ieșire (+${len - maxRun})`);
+          if (len > maxRun) V(e.output, s, en, len, maxRun, "frames", `${len} consecutive frames of ${e.input} without output (+${len - maxRun})`);
         }
         const ok = e.dropRatio <= maxR && longest <= maxRun;
-        perTopic.push({ topic: `${e.input} → ${e.output}`, verdict: ok ? "PASS" : "FAIL", measured: e.dropRatio, limit: maxR, unit: "raport", note: `cea mai lungă secvență: ${longest} (limită ${maxRun})` });
+        perTopic.push({ topic: `${e.input} → ${e.output}`, verdict: ok ? "PASS" : "FAIL", measured: e.dropRatio, limit: maxR, unit: "ratio", note: `longest run: ${longest} (limit ${maxRun})` });
       }
       break;
     }
@@ -218,8 +219,8 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
         let n = 0;
         for (let i = 0; i < t.count; i++) if (bad(i)) n++;
         const ratio = n / t.count;
-        if (ratio > maxR) for (const g of runs(t, bad)) V(t.topic, g.s, g.e, g.i1 - g.i0 + 1, 0, "mesaje", `${g.i1 - g.i0 + 1} mesaje ${def.kind === "empty_max" ? "goale" : "invalide/nedecodabile"}`);
-        perTopic.push({ topic: t.topic, verdict: ratio <= maxR ? "PASS" : "FAIL", measured: ratio, limit: maxR, unit: "raport", note: `${n} din ${t.count}` });
+        if (ratio > maxR) for (const g of runs(t, bad)) V(t.topic, g.s, g.e, g.i1 - g.i0 + 1, 0, "messages", `${g.i1 - g.i0 + 1} ${def.kind === "empty_max" ? "empty" : "invalid/undecodable"} messages`);
+        perTopic.push({ topic: t.topic, verdict: ratio <= maxR ? "PASS" : "FAIL", measured: ratio, limit: maxR, unit: "ratio", note: `${n} of ${t.count}` });
       }
       break;
     }
@@ -241,10 +242,10 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
         for (const g of runs(t, bad)) {
           const vals = Array.from({ length: g.i1 - g.i0 + 1 }, (_, k) => val(g.i0 + k));
           const w = def.kind === "valid_min" ? Math.min(...vals) : Math.max(...vals);
-          V(t.topic, g.s, g.e, w, lim, "raport", `${vals.length} mesaje, cel mai rău ${(w * 100).toFixed(1)}% (limită ${(lim * 100).toFixed(1)}%)`);
+          V(t.topic, g.s, g.e, w, lim, "ratio", `${vals.length} messages, worst ${(w * 100).toFixed(1)}% (limit ${(lim * 100).toFixed(1)}%)`);
         }
         if (!Number.isFinite(worst)) worst = NaN;
-        perTopic.push({ topic: t.topic, verdict: nBad === 0 ? "PASS" : "FAIL", measured: worst, limit: lim, unit: "raport", note: `${nBad} mesaje în afara limitei` });
+        perTopic.push({ topic: t.topic, verdict: nBad === 0 ? "PASS" : "FAIL", measured: worst, limit: lim, unit: "ratio", note: `${nBad} messages outside the limit` });
       }
       break;
     }
@@ -259,10 +260,10 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
           const len = g.i1 - g.i0 + 1;
           n += len;
           longest = Math.max(longest, len);
-          if (len >= maxRun) V(t.topic, g.s, g.e, len + 1, maxRun, "cadre", `${len + 1} cadre identice consecutive (ieșire înghețată)`);
+          if (len >= maxRun) V(t.topic, g.s, g.e, len + 1, maxRun, "frames", `${len + 1} identical consecutive frames (frozen output)`);
         }
         const ratio = n / t.count;
-        perTopic.push({ topic: t.topic, verdict: ratio <= maxR && longest < maxRun ? "PASS" : "FAIL", measured: ratio, limit: maxR, unit: "raport", note: `cea mai lungă repetare: ${longest + (longest ? 1 : 0)} cadre` });
+        perTopic.push({ topic: t.topic, verdict: ratio <= maxR && longest < maxRun ? "PASS" : "FAIL", measured: ratio, limit: maxR, unit: "ratio", note: `longest repeat: ${longest + (longest ? 1 : 0)} frames` });
       }
       break;
     }
@@ -271,10 +272,10 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
       for (const t of topics.filter((x) => x.clock)) {
         const c = t.clock!;
         const bad = [...c.nonMonotonic, ...(allowDup ? [] : c.duplicates), ...c.future].sort((x, y) => x - y);
-        for (const i of c.nonMonotonic) V(t.topic, t.log[i - 1], t.log[i], (t.stamp[i] - t.stamp[i - 1]) / NS_PER_MS, 0, "ms", `stamp-ul scade cu ${((t.stamp[i - 1] - t.stamp[i]) / NS_PER_MS).toFixed(2)} ms`);
-        if (!allowDup) for (const i of c.duplicates) V(t.topic, t.log[i], t.log[i], 0, 0, "ms", "stamp duplicat");
-        for (const i of c.future) V(t.topic, t.log[i], t.log[i], (t.stamp[i] - t.log[i]) / NS_PER_MS, 0, "ms", `stamp cu ${((t.stamp[i] - t.log[i]) / NS_PER_MS).toFixed(2)} ms în viitor față de log_time`);
-        perTopic.push({ topic: t.topic, verdict: bad.length === 0 ? "PASS" : "FAIL", measured: bad.length, limit: 0, unit: "anomalii", note: `${c.nonMonotonic.length} nemonotone, ${c.duplicates.length} duplicate, ${c.future.length} din viitor` });
+        for (const i of c.nonMonotonic) V(t.topic, t.log[i - 1], t.log[i], (t.stamp[i] - t.stamp[i - 1]) / NS_PER_MS, 0, "ms", `stamp goes back by ${((t.stamp[i - 1] - t.stamp[i]) / NS_PER_MS).toFixed(2)} ms`);
+        if (!allowDup) for (const i of c.duplicates) V(t.topic, t.log[i], t.log[i], 0, 0, "ms", "duplicate stamp");
+        for (const i of c.future) V(t.topic, t.log[i], t.log[i], (t.stamp[i] - t.log[i]) / NS_PER_MS, 0, "ms", `stamp ${((t.stamp[i] - t.log[i]) / NS_PER_MS).toFixed(2)} ms in the future relative to log_time`);
+        perTopic.push({ topic: t.topic, verdict: bad.length === 0 ? "PASS" : "FAIL", measured: bad.length, limit: 0, unit: "anomalies", note: `${c.nonMonotonic.length} non-monotonic, ${c.duplicates.length} duplicates, ${c.future.length} from the future` });
       }
       break;
     }
@@ -283,8 +284,8 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
       for (const t of topics.filter((x) => x.clock)) {
         const s = t.clock!.offsetSummary;
         const bad = (i: number) => t.log[i] - t.stamp[i] > lim * 2;
-        for (const g of runs(t, bad)) V(t.topic, g.s, g.e, (t.log[g.i0] - t.stamp[g.i0]) / NS_PER_MS, (lim * 2) / NS_PER_MS, "ms", "întârziere de transport de peste 2× limita p95");
-        perTopic.push({ topic: t.topic, verdict: s.p95 <= lim ? "PASS" : "FAIL", measured: s.p95 / NS_PER_MS, limit: lim / NS_PER_MS, unit: "ms (p95)", note: `mediană ${(s.p50 / NS_PER_MS).toFixed(2)} ms, max ${(s.max / NS_PER_MS).toFixed(2)} ms` });
+        for (const g of runs(t, bad)) V(t.topic, g.s, g.e, (t.log[g.i0] - t.stamp[g.i0]) / NS_PER_MS, (lim * 2) / NS_PER_MS, "ms", "transport delay above 2× the p95 limit");
+        perTopic.push({ topic: t.topic, verdict: s.p95 <= lim ? "PASS" : "FAIL", measured: s.p95 / NS_PER_MS, limit: lim / NS_PER_MS, unit: "ms (p95)", note: `median ${(s.p50 / NS_PER_MS).toFixed(2)} ms, max ${(s.max / NS_PER_MS).toFixed(2)} ms` });
       }
       break;
     }
@@ -293,7 +294,7 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
       const maxS = num(p.max_spread_ms) * NS_PER_MS;
       for (const g of a.fovGroups) {
         if (g.outputs.length < 2) {
-          perTopic.push({ topic: g.fov, verdict: "N/A", measured: NaN, limit: minC, unit: "raport", note: "un singur tip de ieșire în acest FOV" });
+          perTopic.push({ topic: g.fov, verdict: "N/A", measured: NaN, limit: minC, unit: "ratio", note: "a single output type in this FOV" });
           continue;
         }
         const full = (1 << g.outputs.length) - 1;
@@ -303,25 +304,25 @@ function evalOne(a: Analysis, def: RequirementDef, p: Record<string, number | bo
           worstSpread = Math.max(worstSpread, g.spreadNs[i]);
           if (g.presence[i] !== full) {
             const missing = g.outputs.filter((_, k) => !(g.presence[i] & (1 << k)));
-            V(g.fov, g.stamps[i], g.stamps[i], missing.length, 0, "ieșiri lipsă", `pentru stamp-ul ${(g.stamps[i] / NS_PER_S).toFixed(3)} s lipsește: ${missing.join(", ")}`);
+            V(g.fov, g.stamps[i], g.stamps[i], missing.length, 0, "missing outputs", `for stamp ${(g.stamps[i] / NS_PER_S).toFixed(3)} s missing: ${missing.join(", ")}`);
           } else if (g.spreadNs[i] > maxS) intervals.push([g.stamps[i], g.stamps[i]]);
         }
-        for (const [s, e] of mergeIntervals(intervals, 0)) V(g.fov, s, e, worstSpread / NS_PER_MS, maxS / NS_PER_MS, "ms", "decalaj de publicare între ieșirile aceluiași moment peste limită");
+        for (const [s, e] of mergeIntervals(intervals, 0)) V(g.fov, s, e, worstSpread / NS_PER_MS, maxS / NS_PER_MS, "ms", "publication spread between outputs of the same moment over the limit");
         const ok = g.completeRatio >= minC && worstSpread <= maxS;
-        perTopic.push({ topic: g.fov, verdict: ok ? "PASS" : "FAIL", measured: g.completeRatio, limit: minC, unit: "raport complet", note: `decalaj max ${(worstSpread / NS_PER_MS).toFixed(1)} ms (limită ${maxS / NS_PER_MS} ms)` });
+        perTopic.push({ topic: g.fov, verdict: ok ? "PASS" : "FAIL", measured: g.completeRatio, limit: minC, unit: "complete ratio", note: `max spread ${(worstSpread / NS_PER_MS).toFixed(1)} ms (limit ${maxS / NS_PER_MS} ms)` });
       }
       break;
     }
     default:
-      return { verdict: "N/A", summary: `Tip de cerință necunoscut: ${def.kind}`, perTopic, violations };
+      return { verdict: "N/A", summary: `Unknown requirement kind: ${def.kind}`, perTopic, violations };
   }
   const evaluated = perTopic.filter((t) => t.verdict !== "N/A");
   const verdict: Verdict = evaluated.length === 0 ? "N/A" : evaluated.every((t) => t.verdict === "PASS") ? "PASS" : "FAIL";
   const failed = evaluated.filter((t) => t.verdict === "FAIL").length;
   const summary =
     verdict === "N/A"
-      ? "Niciun topic nu corespunde selectorului — cerința nu poate fi verificată din înregistrare."
-      : `${evaluated.length - failed}/${evaluated.length} PASS, ${violations.length} încălcări localizate în timp`;
+      ? "No topic matches the selector — the requirement cannot be verified from the recording."
+      : `${evaluated.length - failed}/${evaluated.length} PASS, ${violations.length} violations located in time`;
   void gapFactor;
   return { verdict, summary, perTopic, violations };
 }
@@ -331,7 +332,7 @@ export function evaluate(a: Analysis, cfg: ThresholdsConfig, profile: ProfileNam
   return cfg.requirements.map((def) => {
     const params = def[profile] ?? {};
     const r = evalOne(a, def, params, roles, cfg.gap_factor);
-    return { id: def.id, title: def.title, title_en: def.title_en, kind: def.kind, safety: !!def.safety, verification: def.verification, rationale: def.rationale, params, ...r };
+    return { id: def.id, title: def.title, title_ro: def.title_ro, kind: def.kind, safety: !!def.safety, verification: def.verification, rationale: def.rationale, params, ...r };
   });
 }
 

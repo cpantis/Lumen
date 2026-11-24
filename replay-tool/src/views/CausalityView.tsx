@@ -3,6 +3,7 @@
  * latency distribution per input→output pair (p50/p90/p95/p99/max, histogram, over
  * time), dropped input frames, A/B measurement tool, and the requirements draft.
  */
+import { features } from "../state/features";
 import { Copy, Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { layoutDiagram, mermaidDiagram } from "../core/diagram";
@@ -76,13 +77,13 @@ function ABTool() {
     const n = Math.max(0, i1 - i0 + 1);
     return { topic: t.topic, count: n, hz: n > 1 ? ((n - 1) * 1e9) / (t.log[i1] - t.log[i0]) : NaN };
   });
-  const text = [`Interval A–B: ${fmt.s(lo)} → ${fmt.s(hi)} (Δt = ${fmt.ms(hi - lo)})`, ...rowsAB.map((r) => `${r.topic}: ${r.count} mesaje, ${fmt.hz(r.hz)}`), traceLine()].join("\n");
+  const text = [`A–B interval: ${fmt.s(lo)} → ${fmt.s(hi)} (Δt = ${fmt.ms(hi - lo)})`, ...rowsAB.map((r) => `${r.topic}: ${r.count} messages, ${fmt.hz(r.hz)}`), traceLine()].join("\n");
   return (
     <div>
       <div className="row wrap" style={{ marginBottom: 8 }}>
         <Stat value={fmt.ms(hi - lo)} label={tr("Δt A–B")} />
         <span className="spacer" />
-        <button className="btn sm" onClick={() => navigator.clipboard.writeText(text).then(() => toast("Măsurătoare copiată"))}>
+        <button className="btn sm" onClick={() => navigator.clipboard.writeText(text).then(() => toast("Measurement copied"))}>
           <Copy size={14} /> {tr("Copiază ca text")}
         </button>
       </div>
@@ -107,9 +108,9 @@ function RequirementsDraft() {
     crit: Object.entries(r.derived).map(([k, v]) => `${k} = ${v}`).join(", "),
     strict: Object.entries(r.strict).map(([k, v]) => `${k} = ${v}`).join(", "),
     verif: r.verification,
-    safety: r.safety ? "da" : "nu",
+    safety: r.safety ? "yes" : "no",
   }));
-  const headers: Array<[string, string]> = [["id", "ID"], ["stmt", "Cerință"], ["crit", "Criteriu de acceptare (derivat)"], ["strict", "Criteriu strict"], ["verif", "Metodă de verificare"], ["safety", "Siguranță"]];
+  const headers: Array<[string, string]> = [["id", "ID"], ["stmt", "Requirement"], ["crit", "Acceptance criterion (derived)"], ["strict", "Strict criterion"], ["verif", "Verification method"], ["safety", "Safety"]];
   return (
     <>
       <p className="muted small">{tr("Pragurile „derivate” sunt propuse din măsurători (ce face componenta azi, cu o marjă mică). Decizia finală aparține inginerului — aplică-le sau editează YAML-ul în „Cerințe & teste”.")}</p>
@@ -126,9 +127,11 @@ function RequirementsDraft() {
         <button className="btn sm" onClick={() => download("thresholds-propus.yaml", dumpThresholds(proposed), "text/yaml")}>
           <Download size={14} /> YAML
         </button>
-        <button className="btn sm primary" onClick={() => { setThresholdsText(dumpThresholds(proposed)); toast("Pragurile derivate propuse au fost aplicate"); }}>
-          {tr("Aplică pragurile propuse")}
-        </button>
+        {features.requirements && (
+          <button className="btn sm primary" onClick={() => { setThresholdsText(dumpThresholds(proposed)); toast("The proposed derived thresholds were applied"); }}>
+            {tr("Aplică pragurile propuse")}
+          </button>
+        )}
       </div>
     </>
   );
@@ -146,10 +149,10 @@ export function CausalityView() {
   const logMs = useMemo(() => (e ? Array.from(e.latencyFromLog, (v) => v / 1e6) : []), [e]);
   const hist = useMemo(() => histogram(latMs, 50), [latMs]);
   const hx = useMemo(() => hist.edges.slice(0, -1).map((v, i) => (v + hist.edges[i + 1]) / 2), [hist]);
-  const hs = useMemo(() => [{ label: "nr. ieșiri", color: "var(--accent)", values: hist.counts }], [hist]);
+  const hs = useMemo(() => [{ label: "outputs", color: "var(--accent)", values: hist.counts }], [hist]);
   const ts = useMemo(() => [
-    { label: "stamp intrare → publicare ieșire (ms)", color: "var(--accent)", values: latMs, points: true, width: 1 },
-    { label: "log intrare → log ieșire (ms)", color: "var(--accent-2)", values: logMs, width: 1 },
+    { label: "input stamp → output publication (ms)", color: "var(--accent)", values: latMs, points: true, width: 1 },
+    { label: "input log → output log (ms)", color: "var(--accent-2)", values: logMs, width: 1 },
   ], [latMs, logMs]);
   const th = useMemo(() => (e ? [
     { value: e.latencySummary.p95 / 1e6, label: `p95 ${fmt.ms(e.latencySummary.p95)}`, color: "var(--warn)" },
@@ -205,22 +208,22 @@ export function CausalityView() {
         {e && out && inp && (
           <>
             <div className="callout" style={{ marginTop: 16 }}>
-              <b>{tr("Definiția latenței afișate:")}</b> {tr("latență =")} <code>log_time(ieșire) − header.stamp(intrarea potrivită exact)</code> {tr("— timpul de la achiziția cadrului până la publicarea rezultatului (cap-coadă). A doua curbă,")} <code>log_time(ieșire) − log_time(intrare)</code>, exclude transportul intrării. Măsurată pe {e.matched} ieșiri potrivite din {e.outputs}.
+              <b>{tr("Definiția latenței afișate:")}</b> {tr("latență =")} <code>log_time(output) − header.stamp(exactly matched input)</code> {tr("— timpul de la achiziția cadrului până la publicarea rezultatului (cap-coadă). A doua curbă,")} <code>log_time(output) − log_time(input)</code>, excludes the input's transport. Measured on {e.matched} matched outputs out of {e.outputs}.
             </div>
             <div className="grid-2">
               <Plot x={hx} series={hs} bars height={200} xLabel={tr("latență (ms)")} title={tr("Distribuția latenței")} csvName="latenta_hist" />
               <Plot x={out.log} series={ts} time height={200} thresholds={th} title={tr("Latența în timp (click → salt)")} csvName="latenta_timp" />
             </div>
-            <h4 style={{ marginTop: 16 }}>Secvențe de cadre de intrare fără ieșire ({e.droppedInputs.length} cadre, {e.dropRuns.length} secvențe)</h4>
+            <h4 style={{ marginTop: 16 }}>Runs of input frames without output ({e.droppedInputs.length} frames, {e.dropRuns.length} runs)</h4>
             <div className="row wrap">
               {[...e.dropRuns].sort((x, y) => y[2] - x[2]).slice(0, 30).map(([st, en, len], i) => (
                 <button key={i} className="btn sm" onClick={() => jumpTo(st, [e.input, e.output])} data-tip={`${fmt.s(st)} → ${fmt.s(en)}`}>
-                  {len} cadre @ {fmt.s(st, 2)}
+                  {len} frames @ {fmt.s(st, 2)}
                 </button>
               ))}
               {e.dropRuns.length === 0 && <span className="muted small">{tr("Niciun cadru sărit în intervalul activ al ieșirii.")}</span>}
             </div>
-            <Kv items={[["perioadă intrare (mediană)", fmt.ms(inp.rate.medianPeriodNs)], ["perioadă ieșire (mediană)", fmt.ms(out.rate.medianPeriodNs)], ["latență log→log (mediană)", fmt.ms(summarize(e.latencyFromLog).p50)]]} />
+            <Kv items={[["input period (median)", fmt.ms(inp.rate.medianPeriodNs)], ["output period (median)", fmt.ms(out.rate.medianPeriodNs)], ["log→log latency (median)", fmt.ms(summarize(e.latencyFromLog).p50)]]} />
           </>
         )}
       </Section>

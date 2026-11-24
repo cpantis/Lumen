@@ -41,17 +41,17 @@ function setP(c: Calibration, k: ParamKey, v: number): Calibration {
 function FovGroupCard({ fov }: { fov: string }) {
   const a = useApp((s) => s.analysis)!;
   const g = a.fovGroups.find((x) => x.fov === fov);
-  const series = useMemo(() => (g ? [{ label: "decalaj publicare între ieșiri (ms)", color: "var(--accent-2)", values: Array.from(g.spreadNs, (v) => v / 1e6), points: true, width: 1 }] : []), [g]);
+  const series = useMemo(() => (g ? [{ label: "publication spread between outputs (ms)", color: "var(--accent-2)", values: Array.from(g.spreadNs, (v) => v / 1e6), points: true, width: 1 }] : []), [g]);
   if (!g) return <p className="muted small">{tr("FOV fără grup de ieșiri detectat automat.")}</p>;
   const full = (1 << g.outputs.length) - 1;
   const incomplete = Array.from(g.presence).map((m, i) => [m, i] as const).filter(([m]) => m !== full);
   return (
     <>
-      <Kv items={[["intrare primară", g.primaryInput], ["ieșiri", g.outputs.join(", ")], ["momente cu toate ieșirile prezente", fmt.pct(g.completeRatio)], ["momente incomplete", `${incomplete.length}`]]} />
+      <Kv items={[["primary input", g.primaryInput], ["outputs", g.outputs.join(", ")], ["moments with every output present", fmt.pct(g.completeRatio)], ["incomplete moments", `${incomplete.length}`]]} />
       <Plot x={g.stamps} series={series} time height={150} title={tr("Pentru fiecare moment (stamp): diferența dintre publicarea primei și ultimei ieșiri")} csvName={`${fov}_sincron`} />
       {incomplete.slice(0, 20).map(([m, i]) => (
         <button key={i} className="btn sm ghost" onClick={() => jumpTo(g.stamps[i], g.outputs)}>
-          {fmt.s(g.stamps[i])}: lipsește {g.outputs.filter((_, k) => !(m & (1 << k))).join(", ")}
+          {fmt.s(g.stamps[i])}: missing {g.outputs.filter((_, k) => !(m & (1 << k))).join(", ")}
         </button>
       ))}
     </>
@@ -76,7 +76,7 @@ function CalibrationCard({ fov }: { fov: string }) {
   const set = (c: Calibration) => app.set((s) => ({ calibrations: { ...s.calibrations, [fov]: c } }));
   const run = async () => {
     if (!cal) return;
-    setBusy("calcul consistență");
+    setBusy("computing consistency");
     try {
       setSamples(await consistencyOverTime(ft, cal, 80));
     } finally {
@@ -85,36 +85,36 @@ function CalibrationCard({ fov }: { fov: string }) {
   };
   const runEstimate = async () => {
     if (!cal) return;
-    setBusy("estimare parametri (Nelder–Mead)");
+    setBusy("estimating parameters (Nelder–Mead)");
     try {
       const r = await estimate(ft, cal, keys, 8);
       setEst(r);
-      set({ ...r.calibration, note: `Estimat din ${r.frames} cadre; parametri: ${keys.join(", ")}; cost ${r.startCost.toFixed(4)} → ${r.cost.toFixed(4)}.` });
-      toast("Parametri estimați aplicați");
+      set({ ...r.calibration, note: `Estimated from ${r.frames} frames; parameters: ${keys.join(", ")}; cost ${r.startCost.toFixed(4)} → ${r.cost.toFixed(4)}.` });
+      toast("Estimated parameters applied");
     } finally {
       setBusy(undefined);
     }
   };
   const errS = useMemo(() => (samples ? [
-    { label: "eroare relativă mediană", color: "var(--accent)", values: samples.map((x) => x.medianRelError), points: true },
+    { label: "median relative error", color: "var(--accent)", values: samples.map((x) => x.medianRelError), points: true },
     { label: "p90", color: "var(--warn)", values: samples.map((x) => x.p90RelError), width: 1 },
-    { label: "puncte în imagine", color: "var(--accent-2)", values: samples.map((x) => x.inImageRatio), width: 1 },
+    { label: "points in image", color: "var(--accent-2)", values: samples.map((x) => x.inImageRatio), width: 1 },
   ] : []), [samples]);
   const errX = useMemo(() => (samples ? samples.map((x) => x.t) : []), [samples]);
   const errShade = useMemo(() => (samples ? samples.filter((x) => x.medianRelError > 0.05).map((x) => [x.t - 3e7, x.t + 3e7] as [number, number]) : []), [samples]);
   const th = useMemo(() => [{ value: 0.05, label: "5 %", color: "var(--error)" }], []);
 
   if (!ft.cloud || !ft.depth)
-    return <p className="muted small">Pentru comparația nor ↔ adâncime, FOV-ul trebuie să aibă o ieșire PointCloud2 și o ieșire Image de adâncime (16UC1/32FC1). Găsite: nor {ft.cloud?.topic ?? "—"}, adâncime {ft.depth?.topic ?? "—"}.</p>;
+    return <p className="muted small">For the cloud ↔ depth comparison, the FOV needs a PointCloud2 output and a depth Image output (16UC1/32FC1). Found: cloud {ft.cloud?.topic ?? "—"}, depth {ft.depth?.topic ?? "—"}.</p>;
 
   return (
     <>
       <p className="small">
-        {tr("Compară")} <code>{ft.cloud.topic}</code> cu <code>{ft.depth.topic}</code> {tr("pentru același stamp: fiecare punct 3D e proiectat în imaginea de adâncime; eroarea = |Z")}<sub>nor</sub> − Z<sub>adâncime</sub>| / Z<sub>adâncime</sub>{tr(". Imaginea camerei:")} <code>{ft.image?.topic ?? "—"}</code>.
+        {tr("Compară")} <code>{ft.cloud.topic}</code> with <code>{ft.depth.topic}</code> {tr("pentru același stamp: fiecare punct 3D e proiectat în imaginea de adâncime; eroarea = |Z")}<sub>cloud</sub> − Z<sub>depth</sub>| / Z<sub>depth</sub>{tr(". Imaginea camerei:")} <code>{ft.image?.topic ?? "—"}</code>.
       </p>
       {cal && (
         <div className="callout">
-          <b>Sursa calibrării: {cal.source}</b>. {cal.note}
+          <b>Calibration source: {cal.source}</b>. {cal.note}
         </div>
       )}
       {cal && (
@@ -128,9 +128,9 @@ function CalibrationCard({ fov }: { fov: string }) {
                 return (
                   <tr key={p.key}>
                     <td className="mono">{p.label} ({p.unit})</td>
-                    <td><input className="input mono" style={{ width: 120 }} type="number" step={p.deg ? 0.5 : p.unit === "m" ? 0.01 : 1} value={+(p.deg ? (v * 180) / Math.PI : v).toFixed(4)} onChange={(e) => set(setP(cal, p.key, p.deg ? (+e.target.value * Math.PI) / 180 : +e.target.value))} aria-label={`${p.label} în ${p.unit}`} /></td>
-                    <td><input type="checkbox" checked={keys.includes(p.key)} onChange={(e) => setKeys(e.target.checked ? [...keys, p.key] : keys.filter((k) => k !== p.key))} aria-label={`Estimează ${p.label}`} /></td>
-                    {est && <td>{sens ? <span className={`badge ${sens.confidence === "ridicată" ? "ok" : sens.confidence === "medie" ? "warn" : "error"}`}>{sens.confidence}</span> : "—"}</td>}
+                    <td><input className="input mono" style={{ width: 120 }} type="number" step={p.deg ? 0.5 : p.unit === "m" ? 0.01 : 1} value={+(p.deg ? (v * 180) / Math.PI : v).toFixed(4)} onChange={(e) => set(setP(cal, p.key, p.deg ? (+e.target.value * Math.PI) / 180 : +e.target.value))} aria-label={`${p.label} in ${p.unit}`} /></td>
+                    <td><input type="checkbox" checked={keys.includes(p.key)} onChange={(e) => setKeys(e.target.checked ? [...keys, p.key] : keys.filter((k) => k !== p.key))} aria-label={`Estimate ${p.label}`} /></td>
+                    {est && <td>{sens ? <span className={`badge ${sens.confidence === "high" ? "ok" : sens.confidence === "medium" ? "warn" : "error"}`}>{sens.confidence}</span> : "—"}</td>}
                     {est && <td className="num">{sens ? fmt.pct(sens.relativeRise) : "—"}</td>}
                   </tr>
                 );
@@ -143,7 +143,7 @@ function CalibrationCard({ fov }: { fov: string }) {
         <button className="btn sm primary" onClick={run} disabled={!cal || !!busy}><Play size={14} /> {tr("Calculează consistența în timp")}</button>
         <button className="btn sm" onClick={runEstimate} disabled={!cal || !!busy || !keys.length} data-tip={tr("Minimizează eroarea nor↔adâncime pe 8 cadre eșantionate, doar pentru parametrii bifați")}><Wand2 size={14} /> {tr("Estimează parametrii bifați")}</button>
         <button className="btn sm ghost" onClick={() => auto && set(auto)} disabled={!auto}>{tr("Revino la automat")}</button>
-        <button className="btn sm" onClick={() => cal && download(`calibrare-${fov}.json`, JSON.stringify({ fov, calibration: cal, estimate: est && { cost: est.cost, startCost: est.startCost, frames: est.frames, sensitivity: est.sensitivity }, trace: traceLine() }, null, 2), "application/json")}><Download size={14} /> JSON</button>
+        <button className="btn sm" onClick={() => cal && download(`calibration-${fov}.json`, JSON.stringify({ fov, calibration: cal, estimate: est && { cost: est.cost, startCost: est.startCost, frames: est.frames, sensitivity: est.sensitivity }, trace: traceLine() }, null, 2), "application/json")}><Download size={14} /> JSON</button>
         <FileButton accept=".json" onText={(t) => { const o = JSON.parse(t); if (o.calibration) set(o.calibration); }}><Upload size={14} /> {tr("Importă")}</FileButton>
         <button className="btn sm" onClick={() => { const id = uid(); app.set((s) => ({ panels: [...s.panels, { id, topic: ft.image?.topic ?? ft.depth!.topic, kind: "overlay", topic2: ft.cloud!.topic }], layout: [...s.layout, { i: id, x: 0, y: 999, w: 6, h: 8, minW: 2, minH: 3 }], view: "replay" })); }} disabled={!ft.image}>
           {tr("Deschide proiecția în replay")}
@@ -152,14 +152,14 @@ function CalibrationCard({ fov }: { fov: string }) {
       </div>
       {est && (
         <p className="small muted" style={{ marginTop: 8 }}>
-          Estimare pe {est.frames} cadre, {est.iterations} iterații: cost {est.startCost.toFixed(4)} → {est.cost.toFixed(4)}. Încrederea = cât crește costul la o perturbare ±δ a parametrului: un cost plat înseamnă că datele nu constrâng parametrul (încredere scăzută).
+          Estimation on {est.frames} frames, {est.iterations} iterations: cost {est.startCost.toFixed(4)} → {est.cost.toFixed(4)}. Confidence = how much the cost rises for a ±δ perturbation of the parameter: a flat cost means the data does not constrain the parameter (low confidence).
         </p>
       )}
       {samples && (
         <>
           <Plot x={errX} series={errS} time height={200} thresholds={th} shade={errShade} title={tr("Consistența nor ↔ adâncime în timp (click → salt)")} csvName={`${fov}_consistenta`} />
           <div className="row wrap">
-            <StatusBadge kind={samples.every((x) => !(x.medianRelError > 0.05)) ? "pass" : "fail"} label={`${samples.filter((x) => x.medianRelError > 0.05).length} din ${samples.length} cadre eșantionate peste 5 %`} />
+            <StatusBadge kind={samples.every((x) => !(x.medianRelError > 0.05)) ? "pass" : "fail"} label={`${samples.filter((x) => x.medianRelError > 0.05).length} of ${samples.length} sampled frames above 5 %`} />
             {samples.filter((x) => x.medianRelError > 0.05).slice(0, 10).map((x) => (
               <button key={x.t} className="btn sm ghost" onClick={() => jumpTo(x.t, [ft.cloud!.topic, ft.depth!.topic])}>{fmt.s(x.t)}: {fmt.pct(x.medianRelError)}</button>
             ))}

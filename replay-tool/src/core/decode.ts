@@ -67,7 +67,7 @@ export function parseSchemaDefinitions(schema: SchemaInfo): MessageDefinition[] 
     if (i > 0) defs.unshift(...defs.splice(i, 1));
     return defs;
   }
-  throw new Error(`Schema encoding nesuportat pentru definiții ROS: "${schema.encoding}"`);
+  throw new Error(`Unsupported schema encoding for ROS definitions: "${schema.encoding}"`);
 }
 
 /** protobuf: Long → number, bytes stay Uint8Array, default values filled in. */
@@ -81,7 +81,7 @@ function protobufDecoder(schema: SchemaInfo): Decoder {
 function rawDecoder(channel: ChannelInfo, schema: SchemaInfo | undefined): Decoder {
   const enc = channel.messageEncoding;
   const need = () => {
-    if (!schema) throw new Error(`Schema lipsă pentru canal ${enc} (schema_id 0)`);
+    if (!schema) throw new Error(`Missing schema for ${enc} channel (schema_id 0)`);
     return schema;
   };
   switch (enc) {
@@ -108,9 +108,9 @@ function rawDecoder(channel: ChannelInfo, schema: SchemaInfo | undefined): Decod
       return (data) => msgpackDecode(data);
     case "flatbuffer":
     case "capnproto":
-      throw new Error(`Encoding „${enc}” nu e suportat de .lumen Replay (necesită cod generat din schemă); topicul apare în inventar, dar mesajele nu pot fi decodate.`);
+      throw new Error(`The "${enc}" encoding is not supported by StampTrace (it needs code generated from the schema); the topic appears in the inventory, but its messages cannot be decoded.`);
     default:
-      throw new Error(`Message encoding necunoscut: „${enc}”`);
+      throw new Error(`Unknown message encoding: "${enc}"`);
   }
 }
 

@@ -1,5 +1,5 @@
-# .lumen Replay — static build served by nginx.
-#   docker build -t lumen-replay .  &&  docker run --rm -p 8080:80 lumen-replay  → http://localhost:8080
+# StampTrace — static build served by nginx.
+#   docker build -t stamptrace .  &&  docker run --rm -p 8080:80 stamptrace  → http://localhost:8080
 FROM node:22-alpine AS build
 WORKDIR /app
 ARG GIT_COMMIT=docker

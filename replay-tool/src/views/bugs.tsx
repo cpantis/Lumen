@@ -42,7 +42,7 @@ export async function openBugDraft(prefill: Partial<Bug> = {}): Promise<void> {
       endNs,
       topics: v ? [v.topic] : [...new Set(s.panels.map((p) => p.topic))].slice(0, 4),
       measured: v ? `${fmt.n(v.measured, 3)} ${v.unit}` : "",
-      expected: v ? `limită ${v.limit} ${v.unit}` : "",
+      expected: v ? `limit ${v.limit} ${v.unit}` : "",
       actual: v?.message ?? "",
       steps: "",
       images,
@@ -53,8 +53,8 @@ export async function openBugDraft(prefill: Partial<Bug> = {}): Promise<void> {
 
 export function openNoteDraft(): void {
   const t = clock.get().t;
-  app.set((s) => ({ notes: [...s.notes, { id: uid(), t, text: "", tag: "întrebare", priority: 2 }], view: "issues" }));
-  toast(`Notă adăugată la ${(t / 1e9).toFixed(3)} s — completeaz-o în „Bug-uri & note”`);
+  app.set((s) => ({ notes: [...s.notes, { id: uid(), t, text: "", tag: "question", priority: 2 }], view: "issues" }));
+  toast(`Note added at ${(t / 1e9).toFixed(3)} s — fill it in under "Bugs & notes"`);
 }
 
 export function bugMarkdown(b: Bug): string {
@@ -63,20 +63,20 @@ export function bugMarkdown(b: Bug): string {
   return [
     `## ${b.title}`,
     "",
-    `**Severitate:** ${b.severity} — ${b.severityWhy || "(justificare)"}  `,
-    `**Cerință afectată:** ${b.requirement || "—"}  `,
-    `**Unde:** ${fmt.s(b.startNs)} → ${fmt.s(b.endNs)} relativ (absolut ${(BigInt(a.startNs) + BigInt(Math.round(b.startNs))).toString()} → ${(BigInt(a.startNs) + BigInt(Math.round(b.endNs))).toString()} ns)  `,
-    `**Topicuri:** ${b.topics.join(", ")}`,
+    `**Severity:** ${b.severity} — ${b.severityWhy || "(rationale)"}  `,
+    `**Affected requirement:** ${b.requirement || "—"}  `,
+    `**Where:** ${fmt.s(b.startNs)} → ${fmt.s(b.endNs)} relative (absolute ${(BigInt(a.startNs) + BigInt(Math.round(b.startNs))).toString()} → ${(BigInt(a.startNs) + BigInt(Math.round(b.endNs))).toString()} ns)  `,
+    `**Topics:** ${b.topics.join(", ")}`,
     "",
-    "### Dovezi",
-    `- Valoare măsurată: ${b.measured || "—"}`,
+    "### Evidence",
+    `- Measured value: ${b.measured || "—"}`,
     ...b.images.map((im) => `- ![${im.name}](${im.name})`),
     "",
-    "### Pași de reproducere",
+    "### Steps to reproduce",
     steps,
     "",
-    "### Așteptat vs. actual",
-    `- **Așteptat:** ${b.expected || "—"}`,
+    "### Expected vs. actual",
+    `- **Expected:** ${b.expected || "—"}`,
     `- **Actual:** ${b.actual || "—"}`,
     "",
     `<sub>${traceLine()}</sub>`,
@@ -86,10 +86,10 @@ export function bugMarkdown(b: Bug): string {
 export function defaultSteps(b: Bug): string {
   const a = app.get().analysis!;
   return [
-    `1. Deschide înregistrarea \`${a.fileName}\` (SHA-256 \`${a.sha256.slice(0, 16)}…\`) în .lumen Replay.`,
-    `2. Link direct la moment: ${deepLink(b.startNs)}`,
-    `3. Sau din linia de comandă: \`npm run metrics -- ${a.fileName} --out out/\` și caută \`${b.requirement || "cerința"}\` în \`out/report-strict.json\` la t ≈ ${(b.startNs / 1e9).toFixed(3)} s.`,
-    `4. Observă topicurile ${b.topics.join(", ")} în intervalul ${fmt.s(b.startNs)} – ${fmt.s(b.endNs)}.`,
+    `1. Open the recording \`${a.fileName}\` (SHA-256 \`${a.sha256.slice(0, 16)}…\`) in StampTrace.`,
+    `2. Direct link to the moment: ${deepLink(b.startNs)}`,
+    `3. Or from the command line: \`npm run metrics -- ${a.fileName} --out out/\` and look for \`${b.requirement || "the requirement"}\` in \`out/report-strict.json\` at t ≈ ${(b.startNs / 1e9).toFixed(3)} s.`,
+    `4. Observe the topics ${b.topics.join(", ")} in the interval ${fmt.s(b.startNs)} – ${fmt.s(b.endNs)}.`,
   ].join("\n");
 }
 
@@ -102,7 +102,7 @@ export function BugEditor() {
   const save = () => {
     const bug: Bug = {
       id: draft.id ?? uid(),
-      title: draft.title || "(fără titlu)",
+      title: draft.title || "(untitled)",
       severity: draft.severity ?? "Major",
       severityWhy: draft.severityWhy ?? "",
       requirement: draft.requirement ?? "",
@@ -117,10 +117,10 @@ export function BugEditor() {
       createdAt: draft.createdAt ?? new Date().toISOString(),
     };
     app.set((st) => ({ bugs: [...st.bugs.filter((b) => b.id !== bug.id), bug], bugDraft: undefined }));
-    toast("Bug salvat");
+    toast("Bug saved");
   };
   return (
-    <Modal title={draft.id ? "Editează bug" : "Creează bug"} onClose={() => app.set({ bugDraft: undefined })} wide>
+    <Modal title={draft.id ? "Edit bug" : "Create bug"} onClose={() => app.set({ bugDraft: undefined })} wide>
       <div className="grid-2">
         <label className="field" style={{ gridColumn: "1 / -1" }}>{tr("Titlu scurt și specific")}<input className="input" value={draft.title ?? ""} onChange={(e) => set({ title: e.target.value })} /></label>
         <label className="field">{tr("Severitate")}<select className="input" value={draft.severity} onChange={(e) => set({ severity: e.target.value as Bug["severity"] })}>{SEVERITIES.map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -136,7 +136,7 @@ export function BugEditor() {
       </div>
       {(draft.images ?? []).length > 0 && (
         <div className="row wrap" style={{ marginTop: 12 }}>
-          {draft.images!.map((im) => <img key={im.name} src={im.dataUrl} alt={`Captură ${im.name}`} style={{ maxWidth: 320, borderRadius: 8, border: "1px solid var(--border)" }} />)}
+          {draft.images!.map((im) => <img key={im.name} src={im.dataUrl} alt={`Snapshot ${im.name}`} style={{ maxWidth: 320, borderRadius: 8, border: "1px solid var(--border)" }} />)}
         </div>
       )}
       <div className="row" style={{ marginTop: 16 }}>

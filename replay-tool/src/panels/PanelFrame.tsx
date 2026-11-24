@@ -53,7 +53,7 @@ export function PanelFrame({
     app.set((st) => ({ panels: st.panels.map((p) => (p.id === cfg.id ? { ...p, options: { ...p.options, ...patch } } : p)) }));
 
   return (
-    <div className={`panel${highlight ? " highlight" : ""}`} data-topic={cfg.topic} aria-label={`Panou ${title ?? cfg.topic}`}>
+    <div className={`panel${highlight ? " highlight" : ""}`} data-topic={cfg.topic} aria-label={`Panel ${title ?? cfg.topic}`}>
       <div className="panel-head drag-handle">
         <span className="role-bar" style={{ background: topic ? topicColor(topic, s) : "var(--role-unknown)" }} aria-hidden />
         <div className="head-text">
@@ -61,7 +61,7 @@ export function PanelFrame({
             {title ?? cfg.topic}
           </div>
           <div className="meta">
-            {topic ? `${topic.type} · ${fmt.hz(topic.rate.meanHz)} · ${role === "input" ? "intrare" : role === "output" ? `ieșire${fov ? ` ${fov}` : ""}` : "necunoscut"}` : ""}
+            {topic ? `${topic.type} · ${fmt.hz(topic.rate.meanHz)} · ${role === "input" ? "input" : role === "output" ? `output${fov ? ` ${fov}` : ""}` : "unknown"}` : ""}
           </div>
         </div>
         <div className="head-status">
@@ -97,7 +97,7 @@ export function PanelFrame({
               <Settings2 size={15} />
             </button>
           ) : null}
-          <button className="btn icon sm ghost" aria-label={`Elimină panoul ${cfg.topic}`} data-tip={tr("Elimină panoul")} onClick={() => app.set((st) => ({ panels: st.panels.filter((p) => p.id !== cfg.id), layout: st.layout.filter((l) => l.i !== cfg.id) }))}>
+          <button className="btn icon sm ghost" aria-label={`Remove panel ${cfg.topic}`} data-tip={tr("Elimină panoul")} onClick={() => app.set((st) => ({ panels: st.panels.filter((p) => p.id !== cfg.id), layout: st.layout.filter((l) => l.i !== cfg.id) }))}>
             <X size={15} />
           </button>
         </div>
@@ -114,7 +114,7 @@ export function PanelFrame({
       <div className="panel-foot">
         {matchedFrom && (
           <span className="row" style={{ gap: 4, color: "var(--accent)" }}>
-            <Link2 size={12} /> cadrul folosit de {matchedFrom}
+            <Link2 size={12} /> frame used by {matchedFrom}
           </span>
         )}
         {footer}

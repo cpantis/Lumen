@@ -1,45 +1,42 @@
-# Implementation — 2.8 Replay tool (text pentru documentul challenge-ului)
+# Implementation — 2.8 Replay tool (text for the challenge document)
 
-Pentru sub-challenge-ul 2.8 am construit **.lumen Replay**, o aplicație web care redă sincronizat toate fluxurile unei înregistrări ROS 2 MCAP. Așa se poate vedea, în orice moment, ce a intrat în componentă și ce a ieșit din ea. Aplicația rulează integral în browser (TypeScript, React, Vite) și nu are nevoie de ROS:
-- fișierul e citit indexat (`@mcap/core`) direct dintr-un `Blob`, deci înregistrări de câțiva GB nu sunt încărcate în memorie;
-- mesajele sunt decodate din schemele stocate în fișier (CDR, `ros2msg`/`ros2idl`), într-un Web Worker cu cache LRU și prefetch;
-- nimic nu e hardcodat: topicurile, tipurile, frame-urile și câmpurile vizuale sunt descoperite din date.
+For sub-challenge 2.8 I built **StampTrace** (“Synchronised replay & test analysis for MCAP recordings”), a web application that replays every stream of a ROS 2 MCAP recording in sync, so that at any moment one can see what went into the component and what came out of it. The application runs entirely in the browser (TypeScript, React, Vite) and needs no ROS installation:
+- the file is read through its index (`@mcap/core`) directly from a `Blob`, so multi-GB recordings are never loaded into memory;
+- messages are decoded from the schemas stored in the file, in a Web Worker with an LRU cache and prefetching. Every encoding with a public specification in the MCAP registry is supported: `cdr` (`ros2msg`, `ros2idl`, `omgidl`), `ros1`, `protobuf`, `json`, `cbor` and `msgpack`;
+- nothing is hard-coded: topics, types, frames and fields of view are discovered from the data. Foxglove well-known schemas (RawImage, CompressedImage, PointCloud, FrameTransform(s), CameraCalibration, LaserScan) are normalised to the ROS types, so every panel and analysis works on them too.
 
-Interfața e organizată după componentă, pe trei coloane (*Intrări | Ieșiri FOV 1 | Ieșiri FOV 2*), și are un timeline în care:
-- fiecare mesaj e o bifă;
-- golurile sunt evidențiate cu roșu;
-- încălcările cerințelor sunt hașurate;
-- eșecurile din rapoartele de test apar ca markere.
+The interface is organised around the component, in three columns (*Inputs | Outputs FOV 1 | Outputs FOV 2*), with a timeline in which:
+- every message is a tick;
+- gaps are highlighted in red;
+- empty or invalid messages are highlighted.
 
-Fiecare panou afișează vârsta mesajului și starea lui (OK, întârziat, expirat, gol, invalid). Un panou de intrare poate afișa exact cadrul din care a fost produsă ieșirea curentă, iar latența live e tradusă în centimetri parcurși de utilizator.
+Each panel shows the age and the status of its message (OK, late, stale, empty, invalid). An input panel can show exactly the frame the current output was produced from, and the live latency is also translated into centimetres walked by the user.
 
-Decizia tehnică principală a fost ca **toate calculele să stea într-o bibliotecă pură** (`src/core`), folosită identic de aplicație și de un CLI în Node (`npm run metrics`). Biblioteca acoperă:
-- frecvențe, jitter, goluri și analiza ceasurilor;
-- inferența cauzalității din `header.stamp`;
-- latența, cadrele sărite și metricile de conținut;
-- evaluarea cerințelor din `config/thresholds.yaml`.
+The main technical decision was to keep **all computations in a pure library** (`src/core`), used identically by the application and by a Node CLI (`npm run metrics`). The library covers:
+- rates, jitter, gaps and clock analysis;
+- inference of causality from `header.stamp`;
+- latency, skipped frames and content metrics;
+- evaluation of the requirements defined in `config/thresholds.yaml`.
 
-Astfel, ce arată aplicația și ce raportează testele automate provin din același cod și din aceleași praguri, iar ecranul de validare încrucișată verifică acest lucru pe baza fișierelor `metrics.json`.
+What the application shows and what the automatic tests report therefore come from the same code and the same thresholds, and a cross-validation screen checks it by comparing the `metrics.json` files.
 
-Instrumentul ajută direct analiza componentei:
-- **2.1** — inventarul și graficele de regularitate se exportă în Markdown/CSV, gata de lipit în document;
-- **2.2** — diagrama I/O nu e presupusă, ci dedusă: un topic e ieșire doar dacă copiază exact stamp-urile unei intrări și e publicat după ea;
-- **2.3** — consistența nor 3D ↔ adâncime e calculată în timp, iar parametrii de calibrare lipsă sunt estimați (Nelder–Mead), cu încredere per parametru;
-- **2.4** — profilurile *Derivat* și *Strict* sunt comparate cerință cu cerință;
-- **2.5** — fiecare latență și gol e exprimat în distanța parcursă „orbește” la viteza estimată din IMU;
-- **2.6** — bug-urile se creează dintr-un click, cu capturi, valori măsurate și pași de reproducere (deep-link și comandă CLI);
-- **2.7** — notele și întrebările pentru dezvoltator sunt ancorate în timp.
+The tool directly supports the analysis of the component:
+- **2.1** — the inventory and the regularity plots export to Markdown/CSV, ready to paste into the document;
+- **2.2** — the I/O diagram is inferred, not assumed: a topic is an output only if it copies the stamps of an input exactly and is published after it. Hardware-synchronised non-visual sensors (e.g. an IMU stamped on the camera clock) are not accepted as evidence;
+- **2.3** — the 3D cloud ↔ depth consistency is computed over time, and missing calibration parameters are estimated (Nelder–Mead), with a confidence per parameter.
 
-Orice export conține SHA-256 al fișierului, versiunea aplicației și pragurile folosite, ca rezultatele să poată fi reproduse exact.
+Every export carries the SHA-256 of the file, the application version and the thresholds used, so results can be reproduced exactly.
 
-Pentru teste reproductibile am scris un generator de înregistrare sintetică deterministă, cu aceeași structură ca înregistrarea reală (două camere, IMU, CameraInfo, TF, adâncime și nor de puncte pe FOV), în care am **injectat defecte cunoscute**:
-- vârf de latență;
-- cadre sărite;
-- gol de intrare;
-- cadre înghețate;
-- nor gol sau plin de NaN;
-- stamp nemonoton;
-- glitch de IMU;
-- nor deplasat geometric.
+For reproducible tests I wrote a deterministic synthetic recording generator with the same structure as the real recording (two cameras, IMU, CameraInfo, TF, depth image and point cloud per FOV), into which I **injected known defects**:
+- a latency spike;
+- skipped frames;
+- an input gap;
+- frozen frames;
+- an empty or NaN-filled cloud;
+- a non-monotonic stamp;
+- an IMU glitch;
+- a geometrically shifted cloud.
 
-Testele verifică faptul că aplicația le găsește pe toate: 49 de teste unitare, de integrare și de compatibilitate (Vitest) și 15 teste end-to-end (Playwright), care acoperă fiecare export și includ un audit automat de accesibilitate WCAG AA în ambele teme. Compatibilitatea cu alte înregistrări e verificată pe cele 416 fișiere oficiale de conformitate MCAP și pe înregistrări scrise cu bibliotecile oficiale (ROS 2, ROS 1, scheme Foxglove în protobuf și JSON), plus fișiere trunchiate sau corupte. Totul rulează cu o singură comandă: `npm run test:all`. Interfața respectă identitatea vizuală .lumen (logo cu grila Braille, temă închisă implicită, Poppins/JetBrains Mono, butoane pill) și, fiind tehnologie asistivă, e utilizabilă complet din tastatură și cu cititor de ecran.
+The tests check that the application finds all of them: 49 unit, integration and compatibility tests (Vitest) and 16 end-to-end tests (Playwright), which cover every export and include an automatic WCAG AA accessibility audit in both themes. Compatibility with other recordings is verified on the 416 official MCAP conformance files and on recordings written with the official libraries (ROS 2, ROS 1, Foxglove schemas in protobuf and JSON), as well as truncated and corrupted files. Everything runs with a single command: `npm run test:all`. The interface has its own StampTrace logo — an input frame’s stamp traced to the output produced from it — and a visual style inspired by the .lumen identity (dark theme by default, Poppins/JetBrains Mono, pill buttons) and, being assistive technology, is fully usable with the keyboard and a screen reader. The interface is in English, with Romanian available in the settings.
+
+*StampTrace — designed and developed by Calin Pantis.*

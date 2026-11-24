@@ -52,21 +52,21 @@ export function inventoryRows(a: Analysis, role: (t: TopicData) => Role, fov: (t
 
 const HEADERS: Array<[keyof InventoryRow, string]> = [
   ["topic", "Topic"],
-  ["type", "Tip"],
+  ["type", "Type"],
   ["encoding", "Encoding"],
   ["details", "Format"],
   ["frame", "frame_id"],
-  ["count", "Mesaje"],
-  ["meanHz", "Hz medie"],
-  ["medianHz", "Hz mediană"],
+  ["count", "Messages"],
+  ["meanHz", "Mean Hz"],
+  ["medianHz", "Median Hz"],
   ["minHz", "Hz min"],
   ["maxHz", "Hz max"],
   ["jitterMs", "Jitter (ms)"],
-  ["maxGapMs", "Gol max (ms)"],
-  ["gaps", "Goluri"],
-  ["role", "Rol"],
+  ["maxGapMs", "Max gap (ms)"],
+  ["gaps", "Gaps"],
+  ["role", "Role"],
   ["fov", "FOV"],
-  ["reason", "Motivul clasificării"],
+  ["reason", "Classification evidence"],
 ];
 
 export function toCsv(rows: Array<Record<string, unknown>>, headers?: Array<[string, string]>): string {
@@ -94,9 +94,9 @@ export function inventoryCsv(rows: InventoryRow[]): string {
 
 export function inventoryMarkdown(a: Analysis, rows: InventoryRow[], trace: string): string {
   return [
-    `### Inventarul înregistrării \`${a.fileName}\``,
+    `### Recording inventory \`${a.fileName}\``,
     "",
-    `Durată ${(a.durationNs / 1e9).toFixed(2)} s · ${a.topics.length} topicuri · ${a.topics.reduce((s, t) => s + t.count, 0)} mesaje · ${a.indexed ? "indexat" : "neindexat (citire secvențială)"}`,
+    `Duration ${(a.durationNs / 1e9).toFixed(2)} s · ${a.topics.length} topics · ${a.topics.reduce((s, t) => s + t.count, 0)} messages · ${a.indexed ? "indexed" : "not indexed (sequential read)"}`,
     "",
     toMarkdownTable(rows as unknown as Array<Record<string, unknown>>, HEADERS as Array<[string, string]>),
     "",

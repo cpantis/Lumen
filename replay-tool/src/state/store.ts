@@ -71,7 +71,7 @@ export interface Note {
   t: number;
   endT?: number;
   text: string;
-  tag: "întrebare" | "presupunere" | "anomalie" | "bookmark";
+  tag: "question" | "assumption" | "anomaly" | "bookmark";
   priority: 1 | 2 | 3;
 }
 

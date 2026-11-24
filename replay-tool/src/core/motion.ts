@@ -36,10 +36,10 @@ export function estimateMotion(
     cadenceHz: NaN,
     stepLengthM,
     speedMps: DEFAULT_SPEED_MPS,
-    confidence: "scăzută",
+    confidence: "low",
     note,
   });
-  if (!imu || imu.t.length < 50) return assumed("IMU absent sau prea scurt: se presupune 1,4 m/s (viteză tipică de mers a unui adult).");
+  if (!imu || imu.t.length < 50) return assumed("IMU missing or too short: 1.4 m/s assumed (typical adult walking speed).");
   const x = imu.accNorm.map((v) => (Number.isFinite(v) ? v : 0));
   const base = movingAverage(x, imu.t, 1e9);
   const hp = x.map((v, i) => v - base[i]);
@@ -53,7 +53,7 @@ export function estimateMotion(
   const dur = (imu.t[imu.t.length - 1] - imu.t[0]) / 1e9;
   const cadence = steps.length / Math.max(dur, 1e-9);
   if (steps.length < 10 || cadence < 0.8 || cadence > 3) {
-    return assumed(`Detecție de pași neconcludentă (${steps.length} pași, ${cadence.toFixed(2)} pași/s): se presupune 1,4 m/s.`);
+    return assumed(`Step detection inconclusive (${steps.length} steps, ${cadence.toFixed(2)} steps/s): 1.4 m/s assumed.`);
   }
   const speed = cadence * stepLengthM;
   return {
@@ -63,8 +63,8 @@ export function estimateMotion(
     cadenceHz: cadence,
     stepLengthM,
     speedMps: speed,
-    confidence: steps.length > 60 ? "ridicată" : "medie",
-    note: `${steps.length} pași detectați din ${imu.topic} (cadență ${cadence.toFixed(2)} pași/s × lungime pas presupusă ${stepLengthM} m).`,
+    confidence: steps.length > 60 ? "high" : "medium",
+    note: `${steps.length} steps detected from ${imu.topic} (cadence ${cadence.toFixed(2)} steps/s × assumed step length ${stepLengthM} m).`,
   };
 }
 
