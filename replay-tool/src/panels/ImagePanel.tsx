@@ -116,7 +116,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       }
       footer={
         <>
-          <span>{img ? `${img.width}×${img.height} ${img.encoding ?? (msg?.msg as { format?: string })?.format ?? ""}` : ""}</span>
+          <span>{msg?.width ? `${msg.width}×${msg.height} ${img?.encoding ?? (msg?.msg as { format?: string })?.format ?? ""}` : ""}</span>
           <span style={{ color: "var(--text)" }}>{readout}</span>
           <UsageInfo topic={topic} index={index} />
         </>
