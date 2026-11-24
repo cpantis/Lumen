@@ -12,7 +12,8 @@ import { downloadSnapshot, exportVideo } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
 import { fmt, Kv, Logo, Modal } from "./primitives";
-import { openBugDraft, openNoteDraft } from "../views/IssuesView";
+import { openBugDraft, openNoteDraft } from "../views/bugs";
+import { tr } from "../i18n";
 
 export function applyTheme(theme: "dark" | "light", highContrast: boolean): void {
   document.documentElement.dataset.theme = theme;
@@ -28,11 +29,11 @@ export function TopBar() {
   const [theme, setTheme] = useState<"dark" | "light">((document.documentElement.dataset.theme as "dark" | "light") ?? "dark");
   return (
     <header className="topbar">
-      <a href="#main-content" className="skip-link">Sari la conținut</a>
-      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label=".lumen Replay — acasă">
+      <a href="#main-content" className="skip-link">{tr("Sari la conținut")}</a>
+      <button className="btn ghost" style={{ padding: 0, border: 0 }} onClick={() => app.set({ view: "replay" })} aria-label={tr(".lumen Replay — acasă")}>
         <Logo height={22} />
       </button>
-      <span className="small" style={{ opacity: 0.75 }}>Replay</span>
+      <span className="small hide-narrow" style={{ opacity: 0.75 }}>Replay</span>
       <div className="file" data-tour="file">
         {a && (
           <>
@@ -43,9 +44,9 @@ export function TopBar() {
       <button className="btn sm ghost" onClick={() => app.set({ paletteOpen: true })} aria-label={T.commandPalette} data-tip={`${T.commandPalette} (Ctrl/⌘ + K)`}>
         <Search size={16} /> <kbd style={{ background: "transparent", color: "inherit" }}>⌘K</kbd>
       </button>
-      <button className="btn icon ghost" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
-      <button className="btn icon ghost" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
-      <button className="btn icon ghost" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
+      <button className="btn icon ghost hide-narrow" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
       <button
         className="btn icon ghost"
         onClick={() => {
@@ -72,7 +73,7 @@ export function Nav() {
   const fails = results(s.profile, s).filter((r) => r.verdict === "FAIL").length;
   const views: ViewName[] = ["replay", "inventory", "causality", "quality", "consistency", "requirements", "safety", "issues"];
   return (
-    <nav className="nav" role="tablist" aria-label="Vederi" data-tour="nav">
+    <nav className="nav" role="tablist" aria-label={tr("Vederi")} data-tour="nav">
       {views.map((v) => (
         <button key={v} role="tab" aria-selected={view === v} onClick={() => app.set({ view: v })}>
           {T.views[v as keyof typeof T.views]}
@@ -92,14 +93,14 @@ export function Inspector() {
   const { msg } = useDecoded(sel?.topic, sel?.index ?? -1);
   if (!open) return null;
   return (
-    <aside className="inspector" aria-label="Inspector mesaj">
+    <aside className="inspector" aria-label={tr("Inspector mesaj")}>
       <div className="row" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Inspector</h3>
+        <h3 style={{ margin: 0 }}>{tr("Inspector")}</h3>
         <span className="spacer" />
-        <button className="btn icon sm ghost" onClick={() => app.set({ inspectorOpen: false })} aria-label="Închide inspectorul"><X size={16} /></button>
+        <button className="btn icon sm ghost" onClick={() => app.set({ inspectorOpen: false })} aria-label={tr("Închide inspectorul")}><X size={16} /></button>
       </div>
       {!t || !sel ? (
-        <p className="muted small">Apasă ⓘ pe un panou pentru a inspecta mesajul afișat.</p>
+        <p className="muted small">{tr("Apasă ⓘ pe un panou pentru a inspecta mesajul afișat.")}</p>
       ) : (
         <>
           <Kv
@@ -117,9 +118,9 @@ export function Inspector() {
             ]}
           />
           <div className="row" style={{ margin: "8px 0" }}>
-            <button className="btn sm" onClick={() => app.set({ inspector: { topic: t.topic, index: Math.max(0, sel.index - 1) } })}>← anterior</button>
-            <button className="btn sm" onClick={() => app.set({ inspector: { topic: t.topic, index: Math.min(t.count - 1, sel.index + 1) } })}>următor →</button>
-            <button className="btn sm" onClick={() => seek(t.log[sel.index])}>salt aici</button>
+            <button className="btn sm" onClick={() => app.set({ inspector: { topic: t.topic, index: Math.max(0, sel.index - 1) } })}>{tr("← anterior")}</button>
+            <button className="btn sm" onClick={() => app.set({ inspector: { topic: t.topic, index: Math.min(t.count - 1, sel.index + 1) } })}>{tr("următor →")}</button>
+            <button className="btn sm" onClick={() => seek(t.log[sel.index])}>{tr("salt aici")}</button>
           </div>
           <div className="json">{msg?.msg !== undefined ? <JsonTree value={msg.msg} topic={t.topic} /> : msg?.error}</div>
         </>
@@ -207,7 +208,7 @@ export function CommandPalette() {
               <span>{c.label}</span>
             </li>
           ))}
-          {filtered.length === 0 && <li className="muted">Niciun rezultat</li>}
+          {filtered.length === 0 && <li className="muted">{tr("Niciun rezultat")}</li>}
         </ul>
       </div>
     </div>
@@ -232,14 +233,14 @@ export function HelpModal() {
     ["?", "acest ajutor"],
   ];
   return (
-    <Modal title="Ajutor și scurtături" onClose={() => app.set({ helpOpen: false })}>
+    <Modal title={tr("Ajutor și scurtături")} onClose={() => app.set({ helpOpen: false })}>
       <table className="t">
         <tbody>{keys.map(([k, v]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{v}</td></tr>)}</tbody>
       </table>
       <hr />
-      <p className="small">Timeline: click/drag pentru salt, Ctrl+rotiță zoom, Shift+rotiță deplasare, dublu-click resetare. Panourile se mută din antet și se redimensionează din colț.</p>
-      <p className="small">Pe un panou de intrare, selectorul „↔ ieșire” arată exact cadrul de intrare folosit de ieșirea curentă.</p>
-      <button className="btn" onClick={() => app.set({ helpOpen: false, tourStep: 0 })}>Pornește turul ghidat</button>
+      <p className="small">{tr("Timeline: click/drag pentru salt, Ctrl+rotiță zoom, Shift+rotiță deplasare, dublu-click resetare. Panourile se mută din antet și se redimensionează din colț.")}</p>
+      <p className="small">{tr("Pe un panou de intrare, selectorul „↔ ieșire” arată exact cadrul de intrare folosit de ieșirea curentă.")}</p>
+      <button className="btn" onClick={() => app.set({ helpOpen: false, tourStep: 0 })}>{tr("Pornește turul ghidat")}</button>
     </Modal>
   );
 }
@@ -267,7 +268,7 @@ export function SettingsModal() {
         <label className="field">{T.gapFactor}
           <input className="input mono" type="number" min={1.1} step={0.1} value={gap} onChange={(e) => { app.set({ gapFactor: +e.target.value }); prefs.set({ gapFactor: +e.target.value }); }} style={{ width: 120 }} />
         </label>
-        <p className="xs muted">Preferințele se păstrează local în browser. Dimensiunea textului urmează setarea browserului (zoom până la 200 % suportat).</p>
+        <p className="xs muted">{tr("Preferințele se păstrează local în browser. Dimensiunea textului urmează setarea browserului (zoom până la 200 % suportat).")}</p>
       </div>
     </Modal>
   );

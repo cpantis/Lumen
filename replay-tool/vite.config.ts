@@ -16,7 +16,7 @@ export default defineConfig({
   base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "1.0.0"),
-    __GIT_COMMIT__: JSON.stringify(process.env.GIT_COMMIT ?? gitCommit()),
+    __GIT_COMMIT__: JSON.stringify((process.env.GIT_COMMIT ?? process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)) || gitCommit()),
   },
   worker: { format: "es" },
   build: { target: "es2022", chunkSizeWarningLimit: 2500 },

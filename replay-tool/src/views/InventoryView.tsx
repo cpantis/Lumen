@@ -16,6 +16,7 @@ import { FileButton, fmt, Kv, Modal, Section, Stat } from "../ui/primitives";
 import { worker } from "../worker/client";
 import { drawImageFit } from "../panels/ImagePanel";
 import { parsePointCloud, type RosPointCloud2 } from "../core/pointcloud";
+import { tr } from "../i18n";
 
 function Thumbnail({ t }: { t: TopicData }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -67,12 +68,12 @@ function TopicDetail({ t }: { t: TopicData }) {
   return (
     <div className="col" style={{ gap: 16 }}>
       <div className="stats">
-        <Stat value={t.count} label="mesaje" />
-        <Stat value={fmt.hz(t.rate.meanHz)} label="frecvență medie" tip="(n−1) / durată" />
-        <Stat value={fmt.hz(t.rate.medianHz)} label="frecvență nominală" tip="1 / intervalul median" />
-        <Stat value={fmt.ms(t.rate.jitterNs, 2)} label="jitter (σ interval)" />
-        <Stat value={fmt.ms(t.rate.maxGapNs)} label="cel mai mare gol" />
-        <Stat value={t.gaps.length} label="goluri" />
+        <Stat value={t.count} label={tr("mesaje")} />
+        <Stat value={fmt.hz(t.rate.meanHz)} label={tr("frecvență medie")} tip="(n−1) / durată" />
+        <Stat value={fmt.hz(t.rate.medianHz)} label={tr("frecvență nominală")} tip="1 / intervalul median" />
+        <Stat value={fmt.ms(t.rate.jitterNs, 2)} label={tr("jitter (σ interval)")} />
+        <Stat value={fmt.ms(t.rate.maxGapNs)} label={tr("cel mai mare gol")} />
+        <Stat value={t.gaps.length} label={tr("goluri")} />
       </div>
       <div className="grid-2">
         <Kv items={[["tip", t.type], ["encoding", `${t.messageEncoding} / ${t.schemaEncoding}`], ["frame_id", t.frameIds.join(", ") || "—"], ["header", t.hasHeader ? "da (std_msgs/Header)" : "nu"], ...Object.entries(t.details).filter(([k]) => k !== "frame_id").map(([k, v]) => [k, v] as [string, string])]} />
@@ -80,13 +81,13 @@ function TopicDetail({ t }: { t: TopicData }) {
       </div>
       {t.firstError && <div className="callout error">Eroare de decodare: {t.firstError}</div>}
       <div className="grid-2">
-        <Plot x={histX} series={histS} bars height={180} xLabel="interval între mesaje (ms)" title="Histograma intervalelor" csvName={`${t.topic}_intervale`} />
-        <Plot x={rate.t} series={rateS} time height={180} title="Frecvența instantanee în timp (click → salt)" thresholds={ths} csvName={`${t.topic}_rata`} />
+        <Plot x={histX} series={histS} bars height={180} xLabel={tr("interval între mesaje (ms)")} title={tr("Histograma intervalelor")} csvName={`${t.topic}_intervale`} />
+        <Plot x={rate.t} series={rateS} time height={180} title={tr("Frecvența instantanee în timp (click → salt)")} thresholds={ths} csvName={`${t.topic}_rata`} />
       </div>
       {t.clock && (
         <div className="grid-2">
           <div>
-            <h4>Analiza ceasurilor</h4>
+            <h4>{tr("Analiza ceasurilor")}</h4>
             <Kv
               items={[
                 ["log − stamp mediană", fmt.ms(t.clock.offsetSummary.p50, 2)],
@@ -102,10 +103,10 @@ function TopicDetail({ t }: { t: TopicData }) {
               </button>
             ))}
           </div>
-          <Plot x={t.log} series={offS} time height={180} title="log_time − header.stamp în timp" csvName={`${t.topic}_offset`} />
+          <Plot x={t.log} series={offS} time height={180} title={tr("log_time − header.stamp în timp")} csvName={`${t.topic}_offset`} />
         </div>
       )}
-      {!t.clock && <p className="muted small">Topicul nu are std_msgs/Header: analiza ceasurilor nu se aplică.</p>}
+      {!t.clock && <p className="muted small">{tr("Topicul nu are std_msgs/Header: analiza ceasurilor nu se aplică.")}</p>}
     </div>
   );
 }
@@ -122,8 +123,8 @@ export function InventoryView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Inventarul înregistrării</h2>
-        <span className="sub">2.1 · ce conține fișierul, cum e publicat fiecare flux, ce e intrare și ce e ieșire — și de ce</span>
+        <h2>{tr("Inventarul înregistrării")}</h2>
+        <span className="sub">{tr("2.1 · ce conține fișierul, cum e publicat fiecare flux, ce e intrare și ce e ieșire — și de ce")}</span>
       </div>
       {a.warnings.map((w) => <div key={w} className="callout warn">{w}</div>)}
       <Section
@@ -137,41 +138,41 @@ export function InventoryView() {
             <button className="btn sm" onClick={() => download(`inventar-${a.fileName}.csv`, inventoryCsv(rows), "text/csv")}>
               <Download size={14} /> CSV
             </button>
-            <button className="btn sm" onClick={() => download(`clasificare-${a.fileName}.json`, classificationJson(), "application/json")} data-tip="Exportă clasificarea I/O și FOV (inclusiv editările manuale)">
-              <Download size={14} /> Clasificare JSON
+            <button className="btn sm" onClick={() => download(`clasificare-${a.fileName}.json`, classificationJson(), "application/json")} data-tip={tr("Exportă clasificarea I/O și FOV (inclusiv editările manuale)")}>
+              <Download size={14} /> {tr("Clasificare JSON")}
             </button>
             <FileButton accept=".json" onText={(t) => importClassification(t)} tip="Importă o clasificare salvată anterior">
-              <Upload size={14} /> Importă clasificare
+              <Upload size={14} /> {tr("Importă clasificare")}
             </FileButton>
             <button className="btn sm" onClick={async () => setSchemas(await worker.schemas())}>
-              <FileCode2 size={14} /> Scheme
+              <FileCode2 size={14} /> {tr("Scheme")}
             </button>
           </div>
         }
       >
         <div className="stats" style={{ marginBottom: 12 }}>
-          <Stat value={fmt.s(a.durationNs, 2)} label="durată" />
-          <Stat value={a.topics.length} label="topicuri" />
-          <Stat value={totalMsgs.toLocaleString("ro-RO")} label="mesaje" />
-          <Stat value={a.topics.filter((t) => effectiveRole(t, s) === "input").length} label="intrări" />
-          <Stat value={a.topics.filter((t) => effectiveRole(t, s) === "output").length} label="ieșiri" />
-          <Stat value={a.fovGroups.length} label="câmpuri vizuale (FOV)" />
+          <Stat value={fmt.s(a.durationNs, 2)} label={tr("durată")} />
+          <Stat value={a.topics.length} label={tr("topicuri")} />
+          <Stat value={totalMsgs.toLocaleString("ro-RO")} label={tr("mesaje")} />
+          <Stat value={a.topics.filter((t) => effectiveRole(t, s) === "input").length} label={tr("intrări")} />
+          <Stat value={a.topics.filter((t) => effectiveRole(t, s) === "output").length} label={tr("ieșiri")} />
+          <Stat value={a.fovGroups.length} label={tr("câmpuri vizuale (FOV)")} />
         </div>
         <div className="table-wrap" tabIndex={0} style={{ maxHeight: 420 }}>
           <table className="t">
             <thead>
               <tr>
-                <th>Topic</th>
-                <th>Tip</th>
-                <th className="num">Mesaje</th>
-                <th className="num">Hz medie</th>
-                <th className="num">Hz min–max</th>
-                <th className="num">Jitter ms</th>
-                <th className="num">Gol max ms</th>
-                <th className="num">Goluri</th>
-                <th>Rol</th>
+                <th>{tr("Topic")}</th>
+                <th>{tr("Tip")}</th>
+                <th className="num">{tr("Mesaje")}</th>
+                <th className="num">{tr("Hz medie")}</th>
+                <th className="num">{tr("Hz min–max")}</th>
+                <th className="num">{tr("Jitter ms")}</th>
+                <th className="num">{tr("Gol max ms")}</th>
+                <th className="num">{tr("Goluri")}</th>
+                <th>{tr("Rol")}</th>
                 <th>FOV</th>
-                <th>Motivul clasificării</th>
+                <th>{tr("Motivul clasificării")}</th>
               </tr>
             </thead>
             <tbody>
@@ -187,9 +188,9 @@ export function InventoryView() {
                   <td className="num">{r.gaps}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <select className="input" aria-label={`Rol pentru ${r.topic}`} value={r.role} onChange={(e) => app.set((st) => ({ roleOverrides: { ...st.roleOverrides, [r.topic]: e.target.value as Role } }))}>
-                      <option value="input">Intrare</option>
-                      <option value="output">Ieșire</option>
-                      <option value="unknown">Necunoscut</option>
+                      <option value="input">{tr("Intrare")}</option>
+                      <option value="output">{tr("Ieșire")}</option>
+                      <option value="unknown">{tr("Necunoscut")}</option>
                     </select>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
@@ -202,22 +203,22 @@ export function InventoryView() {
           </table>
         </div>
         <p className="xs muted" style={{ marginTop: 8 }}>
-          Euristica: tipurile brute de senzor (Image, CompressedImage, Imu, CameraInfo) sunt intrări; un topic devine <b>ieșire</b> când ≥ 50 % din header.stamp-uri sunt copiate exact din alt topic și e publicat la &gt; 2 ms după el (dovadă de procesare). Rolurile și FOV-urile se pot edita; se salvează local pentru acest fișier (după SHA-256).
+          {tr("Euristica: tipurile brute de senzor (Image, CompressedImage, Imu, CameraInfo) sunt intrări; un topic devine")} <b>ieșire</b> {tr("când ≥ 50 % din header.stamp-uri sunt copiate exact din alt topic și e publicat la > 2 ms după el (dovadă de procesare). Rolurile și FOV-urile se pot edita; se salvează local pentru acest fișier (după SHA-256).")}
         </p>
       </Section>
       {selected && (
-        <Section title={`Detalii: ${selected.topic}`} sub="Regularitatea pe toată înregistrarea, formatul și ceasurile">
+        <Section title={`${tr("Detalii:")} ${selected.topic}`} sub={tr("Regularitatea pe toată înregistrarea, formatul și ceasurile")}>
           <TopicDetail t={selected} />
         </Section>
       )}
       {a.metadata.length > 0 && (
-        <Section title="Metadate din fișier">
+        <Section title={tr("Metadate din fișier")}>
           {a.metadata.map((m) => <Kv key={m.name} items={[[m.name, JSON.stringify(m.data)]]} />)}
         </Section>
       )}
       <p className="xs muted">{traceLine()}</p>
       {schemas && (
-        <Modal title="Schemele mesajelor (din fișier)" onClose={() => setSchemas(undefined)} wide>
+        <Modal title={tr("Schemele mesajelor (din fișier)")} onClose={() => setSchemas(undefined)} wide>
           {schemas.map((sc) => (
             <details key={sc.name} style={{ marginBottom: 8 }}>
               <summary className="mono">{sc.name} <span className="muted">({sc.encoding})</span></summary>

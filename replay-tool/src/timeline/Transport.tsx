@@ -5,7 +5,8 @@ import { fmtUtcNs, parseTimeInput } from "../core/time";
 import { useT } from "../i18n";
 import { seek, setPlaying, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, useClock } from "../state/store";
-import { openBugDraft, openNoteDraft } from "../views/IssuesView";
+import { openBugDraft, openNoteDraft } from "../views/bugs";
+import { tr } from "../i18n";
 
 export function Transport() {
   const T = useT();
@@ -15,7 +16,7 @@ export function Transport() {
   const [jump, setJump] = useState("");
   const abs = BigInt(a.startNs) + BigInt(Math.round(cursor));
   return (
-    <div className="transport" role="toolbar" aria-label="Controale de redare" data-tour="transport">
+    <div className="transport" role="toolbar" aria-label={tr("Controale de redare")} data-tour="transport">
       <button className="btn icon" onClick={() => step(-1)} aria-label={T.stepBack} data-tip={`${T.stepBack} (←)`}>
         <ChevronLeft size={18} />
       </button>
@@ -29,7 +30,7 @@ export function Transport() {
         <span className="num">
           {(cursor / 1e9).toFixed(3)} s <span className="muted">/ {(a.durationNs / 1e9).toFixed(3)} s</span>
         </span>
-        <span className="abs" data-tip="Timp absolut UTC, cu precizie de nanosecundă">
+        <span className="abs" data-tip={tr("Timp absolut UTC, cu precizie de nanosecundă")}>
           {fmtUtcNs(abs)} · {abs.toString()} ns
         </span>
       </div>
@@ -43,15 +44,15 @@ export function Transport() {
           ))}
         </select>
       </label>
-      <select className="input" value={s.stepTopic ?? ""} onChange={(e) => app.set({ stepTopic: e.target.value || undefined })} aria-label={T.stepTopic} data-tip="Pas cadru cu cadru pe un anumit topic (ex. următorul mesaj al ieșirii X)" style={{ maxWidth: 200 }}>
-        <option value="">pas: orice panou</option>
+      <select className="input" value={s.stepTopic ?? ""} onChange={(e) => app.set({ stepTopic: e.target.value || undefined })} aria-label={T.stepTopic} data-tip={tr("Pas cadru cu cadru pe un anumit topic (ex. următorul mesaj al ieșirii X)")} style={{ maxWidth: 200 }}>
+        <option value="">{tr("pas: orice panou")}</option>
         {a.topics.map((t) => (
           <option key={t.topic} value={t.topic}>
             pas: {t.topic}
           </option>
         ))}
       </select>
-      <div className="btn-group" role="group" aria-label={T.timeSource} data-tip="log time = momentul înregistrării; header.stamp = momentul achiziției/procesării">
+      <div className="btn-group" role="group" aria-label={T.timeSource} data-tip={tr("log time = momentul înregistrării; header.stamp = momentul achiziției/procesării")}>
         <button className="btn sm" aria-pressed={s.timeSource === "log"} onClick={() => app.set({ timeSource: "log" })}>
           {T.logTime}
         </button>
@@ -71,18 +72,18 @@ export function Transport() {
           }
         }}
       >
-        <input className="input mono" style={{ width: 110 }} placeholder="salt: 12.5s" value={jump} onChange={(e) => setJump(e.target.value)} aria-label="Salt la timp (ex. 12.5s sau 1500ms)" />
+        <input className="input mono" style={{ width: 110 }} placeholder={tr("salt: 12.5s")} value={jump} onChange={(e) => setJump(e.target.value)} aria-label={tr("Salt la timp (ex. 12.5s sau 1500ms)")} />
       </form>
-      <button className="btn sm" onClick={() => app.set({ markA: clock.get().t })} data-tip="Setează cursorul A la momentul curent (tasta A)">
+      <button className="btn sm" onClick={() => app.set({ markA: clock.get().t })} data-tip={tr("Setează cursorul A la momentul curent (tasta A)")}>
         <Flag size={14} /> A
       </button>
-      <button className="btn sm" onClick={() => app.set({ markB: clock.get().t })} data-tip="Setează cursorul B (tasta B)">
+      <button className="btn sm" onClick={() => app.set({ markB: clock.get().t })} data-tip={tr("Setează cursorul B (tasta B)")}>
         <Flag size={14} /> B
       </button>
       <button className="btn sm icon" aria-pressed={s.loop} onClick={() => app.set({ loop: !s.loop })} aria-label={T.loop} data-tip={T.loop}>
         <Repeat size={14} />
       </button>
-      <button className="btn sm" onClick={() => openBugDraft()} data-tip="Creează un raport de bug pentru momentul curent sau intervalul A–B">
+      <button className="btn sm" onClick={() => openBugDraft()} data-tip={tr("Creează un raport de bug pentru momentul curent sau intervalul A–B")}>
         <BugIcon size={14} /> Bug
       </button>
       <button

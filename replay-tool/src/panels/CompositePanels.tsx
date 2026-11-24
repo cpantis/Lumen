@@ -17,6 +17,7 @@ import { fmt } from "../ui/primitives";
 import { drawImageFit } from "./ImagePanel";
 import { PanelFrame } from "./PanelFrame";
 import { useDecoded, usePanelIndex } from "./useMessage";
+import { tr } from "../i18n";
 
 export function OverlayPanel({ cfg, topic, cloud }: { cfg: PanelConfig; topic: TopicData; cloud?: TopicData }) {
   const a = useApp((s) => s.analysis)!;
@@ -76,7 +77,7 @@ export function OverlayPanel({ cfg, topic, cloud }: { cfg: PanelConfig; topic: T
       topic={cloud ?? topic}
       index={ci}
       title={`Proiecție ${cloud?.topic ?? "?"} → ${topic.topic}`}
-      toolbar={<input type="range" min={0.1} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(+e.target.value)} aria-label="Opacitate puncte" data-tip="Opacitatea punctelor proiectate" style={{ width: 60 }} />}
+      toolbar={<input type="range" min={0.1} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(+e.target.value)} aria-label={tr("Opacitate puncte")} data-tip={tr("Opacitatea punctelor proiectate")} style={{ width: 60 }} />}
       footer={
         <>
           <span data-tip={cal?.note}>calibrare: {cal?.source ?? "…"}</span>
@@ -87,13 +88,13 @@ export function OverlayPanel({ cfg, topic, cloud }: { cfg: PanelConfig; topic: T
             </span>
           )}
           <button className="btn sm ghost" onClick={() => app.set({ view: "consistency" })}>
-            calibrare…
+            {tr("calibrare…")}
           </button>
         </>
       }
     >
-      <canvas ref={canvas} role="img" aria-label="Proiecția norului de puncte peste imagine" />
-      {imgIndex < 0 && <div className="panel-empty">Niciun cadru de cameră cu același stamp ca norul curent</div>}
+      <canvas ref={canvas} role="img" aria-label={tr("Proiecția norului de puncte peste imagine")} />
+      {imgIndex < 0 && <div className="panel-empty">{tr("Niciun cadru de cameră cu același stamp ca norul curent")}</div>}
     </PanelFrame>
   );
 }
@@ -162,18 +163,18 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
         <>
           <div className="btn-group">
             <button className="btn sm" aria-pressed={mode === "overlay"} onClick={() => setMode("overlay")}>
-              suprapunere
+              {tr("suprapunere")}
             </button>
             <button className="btn sm" aria-pressed={mode === "diff"} onClick={() => setMode("diff")}>
-              diferență
+              {tr("diferență")}
             </button>
           </div>
-          {mode === "overlay" && <input type="range" min={0} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(+e.target.value)} aria-label="Transparență imagine B" style={{ width: 60 }} />}
+          {mode === "overlay" && <input type="range" min={0} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(+e.target.value)} aria-label={tr("Transparență imagine B")} style={{ width: 60 }} />}
         </>
       }
       footer={<span>{ib < 0 ? "B: niciun mesaj cu același stamp" : stat}</span>}
     >
-      <canvas ref={canvas} role="img" aria-label="Comparație între două ieșiri" />
+      <canvas ref={canvas} role="img" aria-label={tr("Comparație între două ieșiri")} />
     </PanelFrame>
   );
 }

@@ -14,13 +14,17 @@
  *   imu                     200 Hz, walking at 1.8 steps/s, glitch |a|=120 m/s² at 5 s
  *   /component/status       JSON-encoded topic (generic panel)
  *
- * Usage: npm run gen:synthetic -- [out.mcap] [--seconds 20] [--unindexed]
+ * Usage: npm run gen:synthetic -- [out.mcap] [--seconds 20] [--unindexed] [--lz4]
  */
 import { McapWriter, type IWritable } from "@mcap/core";
 import { parse } from "@foxglove/rosmsg";
 import { MessageWriter } from "@foxglove/rosmsg2-serialization";
 import { openSync, writeSync, closeSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import * as zlib from "node:zlib";
+
+// node:zlib zstd exists from Node 22.15 / 23.8; older Node → lz4 fallback
+const nodeZstd = zlib as unknown as { zstdCompressSync?: (d: Uint8Array, o?: object) => Uint8Array; constants: Record<string, number> };
 // @ts-ignore — lz4js has no type declarations
 import * as lz4 from "lz4js";
 import { SCHEMAS } from "./schemas";
@@ -30,6 +34,7 @@ const out = args.find((a) => !a.startsWith("--") && !/^\d+$/.test(a)) ?? "fixtur
 const secIdx = args.indexOf("--seconds");
 const SECONDS = secIdx >= 0 ? Number(args[secIdx + 1]) : 20;
 const UNINDEXED = args.includes("--unindexed");
+const LZ4 = args.includes("--lz4") || !nodeZstd.zstdCompressSync; // default: zstd (smaller demo download); --lz4 exercises the lz4 path
 
 // ---------------------------------------------------------------------------------
 let seed = 0x1e5;
@@ -118,14 +123,14 @@ function render(cam: Cam, t: number): { rgb: Uint8Array; depth: Float32Array } {
         rgb[o] = 120 + v; rgb[o + 1] = 170 + v / 2; rgb[o + 2] = 235; // sky
         continue;
       }
-      depth[v * W + u] = s * (1 + gauss() * 0.003); // optical-frame z (direction has z = 1) + sensor noise
+      depth[v * W + u] = rand() < 0.02 ? s * (1 + gauss() * 0.003) : s; // optical-frame z (direction has z = 1); sparse sensor noise keeps frames distinct while compressing well
       if (kind === 2) {
         rgb[o] = 200; rgb[o + 1] = 40; rgb[o + 2] = 50;
       } else {
         const gz = dwz * s + walked; // ground coordinate along the walk
         const gx = x * s;
         const stripe = Math.abs(gx) < 1.6 && Math.floor(gz / 0.6) % 2 === 0 && gz % 12 < 4;
-        const shade = Math.max(60, 170 - s * 6) + gauss() * 3; // + photon noise
+        const shade = Math.max(60, 170 - s * 6) + (rand() < 0.02 ? gauss() * 3 : 0); // sparse photon noise
         rgb[o] = stripe ? 235 : shade + 40; // red-ish cycle lane like the real recording
         rgb[o + 1] = stripe ? 235 : shade * 0.45;
         rgb[o + 2] = stripe ? 235 : shade * 0.45;
@@ -180,7 +185,10 @@ async function main() {
     useAttachmentIndex: !UNINDEXED,
     useMetadataIndex: !UNINDEXED,
     chunkSize: 1 << 20,
-    compressChunk: (data) => ({ compression: "lz4", compressedData: Uint8Array.from((lz4 as { compress: (d: Uint8Array) => ArrayLike<number> }).compress(data)) }),
+    compressChunk: (data) =>
+      LZ4
+        ? { compression: "lz4", compressedData: Uint8Array.from((lz4 as { compress: (d: Uint8Array) => ArrayLike<number> }).compress(data)) }
+        : { compression: "zstd", compressedData: new Uint8Array(nodeZstd.zstdCompressSync!(data, { params: { [nodeZstd.constants.ZSTD_c_compressionLevel]: 12 } })) },
   });
   await writer.start({ profile: "ros2", library: "lumen-replay synthetic generator" });
 

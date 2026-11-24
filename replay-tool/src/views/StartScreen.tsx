@@ -6,14 +6,15 @@ import { cancelLoading, openDemo, openFile, recentFiles } from "../state/actions
 import { app, useApp } from "../state/store";
 import { BrailleLoader, Logo, fmt } from "../ui/primitives";
 import { TOOL_ID } from "../state/trace";
+import { tr } from "../i18n";
 
 function Footer() {
   return (
     <footer className="footer">
-      <span>© .lumen · Pedestrian Autonomous Driving AI</span>
+      <span>{tr("Proiect pentru dotLumen SW Test Challenge — nu este un produs oficial .lumen")}</span>
       <span>{TOOL_ID}</span>
-      <span>Rulează 100 % local — fișierul nu e trimis nicăieri</span>
-      <span>Accesibil: tastatură, cititor de ecran, contrast ridicat</span>
+      <span>{tr("Rulează 100 % local — fișierul nu e trimis nicăieri")}</span>
+      <span>{tr("Accesibil: tastatură, cititor de ecran, contrast ridicat")}</span>
     </footer>
   );
 }
@@ -78,7 +79,7 @@ export function StartScreen() {
                   <span className="muted">{fmt.bytes(r.size)}</span>
                   <span className="spacer" />
                   <span className="muted xs">{new Date(r.at).toLocaleString()}</span>
-                  <button className="btn sm" onClick={pick}>redeschide…</button>
+                  <button className="btn sm" onClick={pick}>{tr("redeschide…")}</button>
                 </li>
               ))}
             </ul>
@@ -127,7 +128,7 @@ export function ErrorScreen() {
       <main className="start-hero" id="main-content" role="alert">
         <h2>{T.error}</h2>
         <div className="callout error">{err}</div>
-        <p className="muted small">Verifică faptul că fișierul este o înregistrare MCAP (ROS 2). Fișierele trunchiate sunt citite secvențial; dacă eroarea persistă, rulează <code>npm run inspect -- fișier.mcap</code> pentru detalii.</p>
+        <p className="muted small">{tr("Verifică faptul că fișierul este o înregistrare MCAP (ROS 2). Fișierele trunchiate sunt citite secvențial; dacă eroarea persistă, rulează")} <code>npm run inspect -- fișier.mcap</code> {tr("pentru detalii.")}</p>
         <button className="btn primary" onClick={() => app.set({ phase: "start" })}>{T.retry}</button>
       </main>
       <Footer />

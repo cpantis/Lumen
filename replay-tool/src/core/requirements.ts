@@ -24,6 +24,8 @@ export interface Selector {
 export interface RequirementDef {
   id: string;
   title: string;
+  /** optional English title (UI language EN) */
+  title_en?: string;
   kind: string;
   select: Selector;
   safety: boolean;
@@ -65,6 +67,7 @@ export interface TopicVerdict {
 export interface RequirementResult {
   id: string;
   title: string;
+  title_en?: string;
   kind: string;
   safety: boolean;
   verification: string;
@@ -328,7 +331,7 @@ export function evaluate(a: Analysis, cfg: ThresholdsConfig, profile: ProfileNam
   return cfg.requirements.map((def) => {
     const params = def[profile] ?? {};
     const r = evalOne(a, def, params, roles, cfg.gap_factor);
-    return { id: def.id, title: def.title, kind: def.kind, safety: !!def.safety, verification: def.verification, rationale: def.rationale, params, ...r };
+    return { id: def.id, title: def.title, title_en: def.title_en, kind: def.kind, safety: !!def.safety, verification: def.verification, rationale: def.rationale, params, ...r };
   });
 }
 

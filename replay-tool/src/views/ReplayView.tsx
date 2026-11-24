@@ -4,7 +4,7 @@
  * timeline, and the side inspector.
  */
 import { LayoutGrid, Plus, Save, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import GridLayout, { WidthProvider, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -18,6 +18,7 @@ import { Timeline } from "../timeline/Timeline";
 import { Transport } from "../timeline/Transport";
 import { Plot } from "../ui/Plot";
 import { fmt } from "../ui/primitives";
+import { tr } from "../i18n";
 
 const RGL = WidthProvider(GridLayout);
 
@@ -27,7 +28,8 @@ function LatencyStrip() {
   const source = useApp((s) => s.timeSource);
   const exact = a.edges.filter((e) => e.kind === "exact" && /Image|CompressedImage/.test(a.topics.find((t) => t.topic === e.input)?.type ?? ""));
   const [sel, setSel] = useState(0);
-  const [open, setOpen] = useState(true);
+  const narrow = useNarrow();
+  const [open, setOpen] = useState(!narrow);
   const cursor = useClock();
   const e = exact[Math.min(sel, exact.length - 1)];
   const ot = e && a.topics.find((t) => t.topic === e.output)!;
@@ -42,7 +44,7 @@ function LatencyStrip() {
         <button className="btn sm ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "▾" : "▸"} Latență live
         </button>
-        <select className="input" style={{ minHeight: 26 }} value={sel} onChange={(ev) => setSel(+ev.target.value)} aria-label="Pereche intrare → ieșire">
+        <select className="input" style={{ minHeight: 26 }} value={sel} onChange={(ev) => setSel(+ev.target.value)} aria-label={tr("Pereche intrare → ieșire")}>
           {exact.map((x2, i) => (
             <option key={i} value={i}>
               {x2.input} → {x2.output}
@@ -52,7 +54,7 @@ function LatencyStrip() {
         <span className="num" style={{ fontSize: "var(--text-lg)", color: lat > e.latencySummary.p95 ? "var(--warn)" : "var(--text)" }} aria-live="off">
           {fmt.ms(lat)}
         </span>
-        <span className="muted" data-tip="Distanța parcursă de utilizator în timpul latenței, la viteza estimată">
+        <span className="muted" data-tip={tr("Distanța parcursă de utilizator în timpul latenței, la viteza estimată")}>
           ≈ {fmtDistance(distanceM(lat, speed))} parcurși
         </span>
         <span className="muted xs">
@@ -79,12 +81,12 @@ function AddPanelMenu() {
   const clouds = a.topics.filter((t) => t.type === "sensor_msgs/PointCloud2");
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn sm" onClick={() => setOpen(!open)} aria-expanded={open} data-tip="Adaugă un panou pentru orice topic, o proiecție sau o comparație">
+      <button className="btn sm" onClick={() => setOpen(!open)} aria-expanded={open} data-tip={tr("Adaugă un panou pentru orice topic, o proiecție sau o comparație")}>
         <Plus size={14} /> {T.addPanel}
       </button>
       {open && (
         <div className="card" style={{ position: "absolute", right: 0, top: 36, zIndex: 30, width: 420, maxHeight: 460, overflow: "auto", boxShadow: "var(--shadow)" }}>
-          <h4>Topic</h4>
+          <h4>{tr("Topic")}</h4>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {a.topics.map((t) => (
               <li key={t.topic}>
@@ -96,29 +98,29 @@ function AddPanelMenu() {
             ))}
           </ul>
           <hr />
-          <h4>Proiecție nor 3D → imagine (2.3)</h4>
+          <h4>{tr("Proiecție nor 3D → imagine (2.3)")}</h4>
           <div className="row wrap">
-            <select className="input" aria-label="Imagine" value={overlay.img} onChange={(e) => setOverlay({ ...overlay, img: e.target.value })}>
-              <option value="">imagine…</option>
+            <select className="input" aria-label={tr("Imagine")} value={overlay.img} onChange={(e) => setOverlay({ ...overlay, img: e.target.value })}>
+              <option value="">{tr("imagine…")}</option>
               {images.map((t) => <option key={t.topic}>{t.topic}</option>)}
             </select>
-            <select className="input" aria-label="Nor de puncte" value={overlay.cloud} onChange={(e) => setOverlay({ ...overlay, cloud: e.target.value })}>
-              <option value="">nor…</option>
+            <select className="input" aria-label={tr("Nor de puncte")} value={overlay.cloud} onChange={(e) => setOverlay({ ...overlay, cloud: e.target.value })}>
+              <option value="">{tr("nor…")}</option>
               {clouds.map((t) => <option key={t.topic}>{t.topic}</option>)}
             </select>
-            <button className="btn sm primary" disabled={!overlay.img || !overlay.cloud} onClick={() => add(overlay.img, "overlay", overlay.cloud)}>Adaugă</button>
+            <button className="btn sm primary" disabled={!overlay.img || !overlay.cloud} onClick={() => add(overlay.img, "overlay", overlay.cloud)}>{tr("Adaugă")}</button>
           </div>
-          <h4 style={{ marginTop: 12 }}>Comparație două imagini (suprapunere / diferență)</h4>
+          <h4 style={{ marginTop: 12 }}>{tr("Comparație două imagini (suprapunere / diferență)")}</h4>
           <div className="row wrap">
-            <select className="input" aria-label="Imagine A" value={diff.a} onChange={(e) => setDiff({ ...diff, a: e.target.value })}>
+            <select className="input" aria-label={tr("Imagine A")} value={diff.a} onChange={(e) => setDiff({ ...diff, a: e.target.value })}>
               <option value="">A…</option>
               {images.map((t) => <option key={t.topic}>{t.topic}</option>)}
             </select>
-            <select className="input" aria-label="Imagine B" value={diff.b} onChange={(e) => setDiff({ ...diff, b: e.target.value })}>
+            <select className="input" aria-label={tr("Imagine B")} value={diff.b} onChange={(e) => setDiff({ ...diff, b: e.target.value })}>
               <option value="">B…</option>
               {images.map((t) => <option key={t.topic}>{t.topic}</option>)}
             </select>
-            <button className="btn sm primary" disabled={!diff.a || !diff.b} onClick={() => add(diff.a, "diff", diff.b)}>Adaugă</button>
+            <button className="btn sm primary" disabled={!diff.a || !diff.b} onClick={() => add(diff.a, "diff", diff.b)}>{tr("Adaugă")}</button>
           </div>
         </div>
       )}
@@ -129,31 +131,85 @@ function AddPanelMenu() {
 function LayoutMenu() {
   const T = useT();
   const [, force] = useState(0);
+  const [saving, setSaving] = useState(false);
   const names = Object.keys(savedLayouts());
+  const [name, setName] = useState("");
   return (
-    <div className="row">
+    <div className="row" style={{ position: "relative" }}>
       <button className="btn sm ghost" data-tip={T.layoutReset} aria-label={T.layoutReset} onClick={() => app.set(defaultPanels(app.get().analysis!))}>
         <RotateCcw size={14} />
       </button>
-      <button
-        className="btn sm ghost"
-        data-tip={T.layoutSave}
-        aria-label={T.layoutSave}
-        onClick={() => {
-          const n = prompt("Numele layout-ului:", `layout ${names.length + 1}`);
-          if (n) {
-            saveLayout(n);
-            force((x) => x + 1);
-          }
-        }}
-      >
+      <button className="btn sm ghost" data-tip={T.layoutSave} aria-label={T.layoutSave} aria-expanded={saving} onClick={() => { setName(`layout ${names.length + 1}`); setSaving(!saving); }}>
         <Save size={14} />
       </button>
+      {saving && (
+        <form
+          className="card row"
+          style={{ position: "absolute", right: 0, top: 34, zIndex: 30, boxShadow: "var(--shadow)", padding: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            saveLayout(name.trim());
+            setSaving(false);
+            force((x) => x + 1);
+          }}
+          onKeyDown={(e) => e.key === "Escape" && setSaving(false)}
+        >
+          <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label={tr("Numele layout-ului")} style={{ width: 180 }} />
+          <button className="btn sm primary">{T.layoutSave}</button>
+        </form>
+      )}
       {names.length > 0 && (
         <select className="input" style={{ minHeight: 28 }} aria-label={T.layoutLoad} value="" onChange={(e) => e.target.value && loadLayout(e.target.value)}>
           <option value="">{T.layoutLoad}…</option>
           {names.map((n) => <option key={n}>{n}</option>)}
         </select>
+      )}
+    </div>
+  );
+}
+
+/** True on tablets / phones (≤ 900 px): the replay switches to one panel at a time. */
+export function useNarrow(): boolean {
+  const q = "(max-width: 900px)";
+  const [narrow, setNarrow] = useState(() => typeof matchMedia !== "undefined" && matchMedia(q).matches);
+  useEffect(() => {
+    const m = matchMedia(q);
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
+/** Compact mode (tablet / phone): one panel at a time + selector. */
+function CompactPanels() {
+  const T = useT();
+  const s = useApp((st) => st);
+  const a = s.analysis!;
+  const [i, setI] = useState(0);
+  const k = Math.min(i, Math.max(0, s.panels.length - 1));
+  const p = s.panels[k];
+  return (
+    <div className="col" style={{ gap: 8, padding: 8 }}>
+      <div className="row wrap">
+        <button className="btn sm icon" aria-label={tr("Panoul anterior")} disabled={k === 0} onClick={() => setI(k - 1)}>‹</button>
+        <select className="input" style={{ flex: 1, minWidth: 0 }} aria-label={tr("Panoul afișat")} value={k} onChange={(e) => setI(+e.target.value)}>
+          {s.panels.map((x, j) => (
+            <option key={x.id} value={j}>
+              {j + 1}/{s.panels.length} · {x.kind === "auto" ? x.topic : `${x.kind}: ${x.topic}`}
+            </option>
+          ))}
+        </select>
+        <button className="btn sm icon" aria-label={tr("Panoul următor")} disabled={k >= s.panels.length - 1} onClick={() => setI(k + 1)}>›</button>
+        <AddPanelMenu />
+      </div>
+      {p ? (
+        <div style={{ height: "52vh", minHeight: 260 }}>
+          <PanelFor cfg={p} topics={a.topics} />
+        </div>
+      ) : (
+        <div className="panel-empty" style={{ position: "static", height: 200 }}>Niciun panou. {T.addPanel}.</div>
       )}
     </div>
   );
@@ -165,12 +221,26 @@ export function ReplayView() {
   const a = s.analysis!;
   const fovs = fovList(a, s);
   const nIn = a.topics.filter((t) => effectiveRole(t, s) === "input").length;
+  const narrow = useNarrow();
+  if (narrow)
+    return (
+      <div className="replay narrow" id="main-content">
+        <div>
+          <Transport />
+          <LatencyStrip />
+        </div>
+        <div className="replay-grid" data-tour="panels">
+          <CompactPanels />
+        </div>
+        <Timeline />
+      </div>
+    );
   return (
     <div className="replay" id="main-content">
       <div>
         <Transport />
         <LatencyStrip />
-        <div className="col-heads" role="group" aria-label="Coloane: intrări, ieșiri pe FOV">
+        <div className="col-heads" role="group" aria-label={tr("Coloane: intrări, ieșiri pe FOV")}>
           <div className="col-head"><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {T.inputs} · {nIn}</div>
           <div className="col-head"><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {T.outputs} FOV 1 · {fovs[0] ?? "—"}</div>
           <div className="col-head">

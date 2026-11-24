@@ -4,6 +4,7 @@
  */
 import { AlertTriangle, CheckCircle2, CircleSlash, Clock3, HelpCircle, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { tr } from "../i18n";
 
 /**
  * `.lumen` logo: 4×3 braille-style dot grid + wordmark (recreated as inline SVG).
@@ -107,7 +108,7 @@ export function Modal({ title, onClose, children, wide, labelledBy }: { title: s
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby={id} ref={ref} style={wide ? { width: "min(1100px, calc(100vw - 32px))" } : undefined}>
         <div className="modal-head">
           <h2 id={id}>{title}</h2>
-          <button className="btn icon ghost" onClick={onClose} aria-label="Închide" data-tip="Închide (Esc)">
+          <button className="btn icon ghost" onClick={onClose} aria-label={tr("Închide")} data-tip={tr("Închide (Esc)")}>
             <X size={18} />
           </button>
         </div>

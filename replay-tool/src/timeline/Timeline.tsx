@@ -12,6 +12,7 @@ import { app, clock, useApp, useClock } from "../state/store";
 import { fmtRelS } from "../core/time";
 import { lastAtOrBefore } from "../core/sync";
 import { detectGaps } from "../core/stats";
+import { tr } from "../i18n";
 
 const LABEL_W = 210;
 const ROW_H = 16;
@@ -275,7 +276,7 @@ export function Timeline() {
           ref={canvas}
           role="slider"
           tabIndex={0}
-          aria-label="Timeline: poziția de redare"
+          aria-label={tr("Timeline: poziția de redare")}
           aria-valuemin={0}
           aria-valuemax={Math.round(a.durationNs / 1e6)}
           aria-valuenow={Math.round(cursor / 1e6)}
@@ -291,14 +292,14 @@ export function Timeline() {
           }}
         />
       </div>
-      <div className="legend" aria-label="Legendă timeline">
-        <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> intrări</span>
-        <span><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> ieșiri FOV 1</span>
-        <span><i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> ieșiri FOV 2</span>
+      <div className="legend" aria-label={tr("Legendă timeline")}>
+        <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {tr("intrări")}</span>
+        <span><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {tr("ieșiri FOV 1")}</span>
+        <span><i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> {tr("ieșiri FOV 2")}</span>
         <span><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gol (&gt; {s.gapFactor}× perioada)</span>
-        <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> mesaj gol / bug</span>
+        <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> {tr("mesaj gol / bug")}</span>
         <span><i style={{ display: "inline-block", width: 14, height: 10, background: "var(--error)", opacity: 0.3 }} /> încălcare cerință ({s.profile === "strict" ? "Strict" : "Derivat"})</span>
-        <span>▲ eșec din raport importat</span>
+        <span>{tr("▲ eșec din raport importat")}</span>
         <span className="spacer" />
         <span>
           {view[0] > 0 || view[1] < a.durationNs ? `zoom ${fmtRelS(view[0], 1)}–${fmtRelS(view[1], 1)} · ` : ""}Ctrl+rotiță zoom · Shift+rotiță deplasare · dublu-click resetare

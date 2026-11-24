@@ -9,6 +9,7 @@ import { results, effectiveRole } from "../state/actions";
 import { app, useApp } from "../state/store";
 import { Plot } from "../ui/Plot";
 import { fmt, Section } from "../ui/primitives";
+import { tr } from "../i18n";
 
 function aggregates(t: TopicData) {
   let empty = 0, invalid = 0, nan = 0, zero = 0, oor = 0, dup = 0, longestDup = 0, run = 0;
@@ -78,18 +79,18 @@ export function QualityView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Calitatea conținutului</h2>
-        <span className="sub">Nu doar „a sosit mesajul?”, ci „ce conține?” — profil activ: <b>{s.profile === "strict" ? "Strict" : "Derivat"}</b></span>
+        <h2>{tr("Calitatea conținutului")}</h2>
+        <span className="sub">{tr("Nu doar „a sosit mesajul?”, ci „ce conține?” — profil activ:")} <b>{s.profile === "strict" ? "Strict" : "Derivat"}</b></span>
         <span className="spacer" />
-        <div className="btn-group" role="group" aria-label="Profil de praguri">
-          <button className="btn sm" aria-pressed={s.profile === "derived"} onClick={() => app.set({ profile: "derived" })}>Derivat</button>
-          <button className="btn sm" aria-pressed={s.profile === "strict"} onClick={() => app.set({ profile: "strict" })}>Strict</button>
+        <div className="btn-group" role="group" aria-label={tr("Profil de praguri")}>
+          <button className="btn sm" aria-pressed={s.profile === "derived"} onClick={() => app.set({ profile: "derived" })}>{tr("Derivat")}</button>
+          <button className="btn sm" aria-pressed={s.profile === "strict"} onClick={() => app.set({ profile: "strict" })}>{tr("Strict")}</button>
         </div>
       </div>
-      <Section title="Sumar pe topic" sub="Valori cumulate pe toată înregistrarea; click pe un rând pentru grafice în timp">
+      <Section title={tr("Sumar pe topic")} sub={tr("Valori cumulate pe toată înregistrarea; click pe un rând pentru grafice în timp")}>
         <div className="table-wrap" tabIndex={0} style={{ maxHeight: 340 }}>
           <table className="t">
-            <thead><tr><th>Topic</th><th className="num">Mesaje</th><th className="num">Goale</th><th className="num">Invalide</th><th className="num">NaN mediu</th><th className="num">Zero mediu</th><th className="num">În afara intervalului</th><th className="num">Cadre repetate</th><th className="num">Repetare max</th></tr></thead>
+            <thead><tr><th>{tr("Topic")}</th><th className="num">{tr("Mesaje")}</th><th className="num">{tr("Goale")}</th><th className="num">{tr("Invalide")}</th><th className="num">{tr("NaN mediu")}</th><th className="num">{tr("Zero mediu")}</th><th className="num">{tr("În afara intervalului")}</th><th className="num">{tr("Cadre repetate")}</th><th className="num">{tr("Repetare max")}</th></tr></thead>
             <tbody>
               {a.topics.map((x) => {
                 const g = aggregates(x);
@@ -112,12 +113,12 @@ export function QualityView() {
         </div>
       </Section>
       {t && (
-        <Section title={`Conținut în timp: ${t.topic}`} sub="Liniile întrerupte = pragurile profilului activ; zonele hașurate roșu = încălcări. Click pe grafic → salt în replay.">
+        <Section title={`${tr("Conținut în timp:")} ${t.topic}`} sub={tr("Liniile întrerupte = pragurile profilului activ; zonele hașurate roșu = încălcări. Click pe grafic → salt în replay.")}>
           <div className="grid-2">
-            <Plot x={t.log} series={s1} time height={200} thresholds={th1} shade={[...shadeFor("nan_max"), ...shadeFor("valid_min")]} yRange={[0, 1]} title="Proporții per mesaj (0–1)" csvName={`${t.topic}_continut`} />
-            <Plot x={t.log} series={s2} time height={200} thresholds={th2} shade={shadeFor("out_of_range_max")} yRange={[0, 1]} title="Valori în afara intervalului plauzibil (0–1)" csvName={`${t.topic}_plauzibil`} />
-            <Plot x={t.log} series={s3} time height={200} title={`Min / medie / max ale valorilor valide (${unit})`} csvName={`${t.topic}_valori`} />
-            <Plot x={t.log} series={s4} time height={200} shade={[...shadeFor("duplicate_max"), ...shadeFor("empty_max"), ...shadeFor("invalid_max")]} title="Cadre înghețate, goale, invalide; număr de elemente" csvName={`${t.topic}_integritate`} />
+            <Plot x={t.log} series={s1} time height={200} thresholds={th1} shade={[...shadeFor("nan_max"), ...shadeFor("valid_min")]} yRange={[0, 1]} title={tr("Proporții per mesaj (0–1)")} csvName={`${t.topic}_continut`} />
+            <Plot x={t.log} series={s2} time height={200} thresholds={th2} shade={shadeFor("out_of_range_max")} yRange={[0, 1]} title={tr("Valori în afara intervalului plauzibil (0–1)")} csvName={`${t.topic}_plauzibil`} />
+            <Plot x={t.log} series={s3} time height={200} title={`${tr("Min / medie / max ale valorilor valide")} (${unit})`} csvName={`${t.topic}_valori`} />
+            <Plot x={t.log} series={s4} time height={200} shade={[...shadeFor("duplicate_max"), ...shadeFor("empty_max"), ...shadeFor("invalid_max")]} title={tr("Cadre înghețate, goale, invalide; număr de elemente")} csvName={`${t.topic}_integritate`} />
           </div>
           <p className="xs muted">
             Metodă: imaginile se evaluează pe o sub-grilă deterministă de ≤ 50 000 pixeli; norii de puncte pe toate punctele (distanța euclidiană în m); „identic” = hash FNV-1a pe ≤ 4096 octeți eșantionați + lungime. Intervale plauzibile: {JSON.stringify(s.thresholds?.plausible_ranges)}.
