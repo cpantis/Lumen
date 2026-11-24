@@ -10,6 +10,7 @@ import "uplot/dist/uPlot.min.css";
 import { toCsv, download } from "../core/inventory";
 import { clock } from "../state/store";
 import { seek } from "../state/actions";
+import { tr } from "../i18n";
 
 export interface PlotSeries {
   label: string;
@@ -173,7 +174,7 @@ export function Plot(props: PlotProps) {
           {props.csvName && (
             <button
               className="btn sm ghost"
-              data-tip="Export CSV al seriilor din grafic"
+              data-tip={tr("Export CSV al seriilor din grafic")}
               onClick={() => {
                 const rows = Array.from(props.x, (xv, i) => {
                   const r: Record<string, unknown> = { [props.time ? "t_rel_s" : "x"]: props.time ? xv / 1e9 : xv };

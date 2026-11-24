@@ -13,6 +13,7 @@ import { app, toast, uid, useApp } from "../state/store";
 import { traceLine } from "../state/trace";
 import { Plot } from "../ui/Plot";
 import { BrailleLoader, FileButton, fmt, Kv, Section, StatusBadge } from "../ui/primitives";
+import { tr } from "../i18n";
 
 const PARAMS: Array<{ key: ParamKey; label: string; unit: string; deg?: boolean }> = [
   { key: "fx", label: "fx", unit: "px" },
@@ -41,13 +42,13 @@ function FovGroupCard({ fov }: { fov: string }) {
   const a = useApp((s) => s.analysis)!;
   const g = a.fovGroups.find((x) => x.fov === fov);
   const series = useMemo(() => (g ? [{ label: "decalaj publicare între ieșiri (ms)", color: "var(--accent-2)", values: Array.from(g.spreadNs, (v) => v / 1e6), points: true, width: 1 }] : []), [g]);
-  if (!g) return <p className="muted small">FOV fără grup de ieșiri detectat automat.</p>;
+  if (!g) return <p className="muted small">{tr("FOV fără grup de ieșiri detectat automat.")}</p>;
   const full = (1 << g.outputs.length) - 1;
   const incomplete = Array.from(g.presence).map((m, i) => [m, i] as const).filter(([m]) => m !== full);
   return (
     <>
       <Kv items={[["intrare primară", g.primaryInput], ["ieșiri", g.outputs.join(", ")], ["momente cu toate ieșirile prezente", fmt.pct(g.completeRatio)], ["momente incomplete", `${incomplete.length}`]]} />
-      <Plot x={g.stamps} series={series} time height={150} title="Pentru fiecare moment (stamp): diferența dintre publicarea primei și ultimei ieșiri" csvName={`${fov}_sincron`} />
+      <Plot x={g.stamps} series={series} time height={150} title={tr("Pentru fiecare moment (stamp): diferența dintre publicarea primei și ultimei ieșiri")} csvName={`${fov}_sincron`} />
       {incomplete.slice(0, 20).map(([m, i]) => (
         <button key={i} className="btn sm ghost" onClick={() => jumpTo(g.stamps[i], g.outputs)}>
           {fmt.s(g.stamps[i])}: lipsește {g.outputs.filter((_, k) => !(m & (1 << k))).join(", ")}
@@ -109,7 +110,7 @@ function CalibrationCard({ fov }: { fov: string }) {
   return (
     <>
       <p className="small">
-        Compară <code>{ft.cloud.topic}</code> cu <code>{ft.depth.topic}</code> pentru același stamp: fiecare punct 3D e proiectat în imaginea de adâncime; eroarea = |Z<sub>nor</sub> − Z<sub>adâncime</sub>| / Z<sub>adâncime</sub>. Imaginea camerei: <code>{ft.image?.topic ?? "—"}</code>.
+        {tr("Compară")} <code>{ft.cloud.topic}</code> cu <code>{ft.depth.topic}</code> {tr("pentru același stamp: fiecare punct 3D e proiectat în imaginea de adâncime; eroarea = |Z")}<sub>nor</sub> − Z<sub>adâncime</sub>| / Z<sub>adâncime</sub>{tr(". Imaginea camerei:")} <code>{ft.image?.topic ?? "—"}</code>.
       </p>
       {cal && (
         <div className="callout">
@@ -119,7 +120,7 @@ function CalibrationCard({ fov }: { fov: string }) {
       {cal && (
         <div className="table-wrap" tabIndex={0} style={{ marginBottom: 12 }}>
           <table className="t">
-            <thead><tr><th>Parametru</th><th>Valoare</th><th>Estimează</th>{est && <th>Încredere</th>}{est && <th className="num">Creștere cost la ±δ</th>}</tr></thead>
+            <thead><tr><th>{tr("Parametru")}</th><th>{tr("Valoare")}</th><th>{tr("Estimează")}</th>{est && <th>{tr("Încredere")}</th>}{est && <th className="num">{tr("Creștere cost la ±δ")}</th>}</tr></thead>
             <tbody>
               {PARAMS.map((p) => {
                 const v = getP(cal, p.key);
@@ -139,13 +140,13 @@ function CalibrationCard({ fov }: { fov: string }) {
         </div>
       )}
       <div className="row wrap">
-        <button className="btn sm primary" onClick={run} disabled={!cal || !!busy}><Play size={14} /> Calculează consistența în timp</button>
-        <button className="btn sm" onClick={runEstimate} disabled={!cal || !!busy || !keys.length} data-tip="Minimizează eroarea nor↔adâncime pe 8 cadre eșantionate, doar pentru parametrii bifați"><Wand2 size={14} /> Estimează parametrii bifați</button>
-        <button className="btn sm ghost" onClick={() => auto && set(auto)} disabled={!auto}>Revino la automat</button>
+        <button className="btn sm primary" onClick={run} disabled={!cal || !!busy}><Play size={14} /> {tr("Calculează consistența în timp")}</button>
+        <button className="btn sm" onClick={runEstimate} disabled={!cal || !!busy || !keys.length} data-tip={tr("Minimizează eroarea nor↔adâncime pe 8 cadre eșantionate, doar pentru parametrii bifați")}><Wand2 size={14} /> {tr("Estimează parametrii bifați")}</button>
+        <button className="btn sm ghost" onClick={() => auto && set(auto)} disabled={!auto}>{tr("Revino la automat")}</button>
         <button className="btn sm" onClick={() => cal && download(`calibrare-${fov}.json`, JSON.stringify({ fov, calibration: cal, estimate: est && { cost: est.cost, startCost: est.startCost, frames: est.frames, sensitivity: est.sensitivity }, trace: traceLine() }, null, 2), "application/json")}><Download size={14} /> JSON</button>
-        <FileButton accept=".json" onText={(t) => { const o = JSON.parse(t); if (o.calibration) set(o.calibration); }}><Upload size={14} /> Importă</FileButton>
+        <FileButton accept=".json" onText={(t) => { const o = JSON.parse(t); if (o.calibration) set(o.calibration); }}><Upload size={14} /> {tr("Importă")}</FileButton>
         <button className="btn sm" onClick={() => { const id = uid(); app.set((s) => ({ panels: [...s.panels, { id, topic: ft.image?.topic ?? ft.depth!.topic, kind: "overlay", topic2: ft.cloud!.topic }], layout: [...s.layout, { i: id, x: 0, y: 999, w: 6, h: 8, minW: 2, minH: 3 }], view: "replay" })); }} disabled={!ft.image}>
-          Deschide proiecția în replay
+          {tr("Deschide proiecția în replay")}
         </button>
         {busy && <span className="row small"><BrailleLoader label={busy} /> {busy}…</span>}
       </div>
@@ -156,7 +157,7 @@ function CalibrationCard({ fov }: { fov: string }) {
       )}
       {samples && (
         <>
-          <Plot x={errX} series={errS} time height={200} thresholds={th} shade={errShade} title="Consistența nor ↔ adâncime în timp (click → salt)" csvName={`${fov}_consistenta`} />
+          <Plot x={errX} series={errS} time height={200} thresholds={th} shade={errShade} title={tr("Consistența nor ↔ adâncime în timp (click → salt)")} csvName={`${fov}_consistenta`} />
           <div className="row wrap">
             <StatusBadge kind={samples.every((x) => !(x.medianRelError > 0.05)) ? "pass" : "fail"} label={`${samples.filter((x) => x.medianRelError > 0.05).length} din ${samples.length} cadre eșantionate peste 5 %`} />
             {samples.filter((x) => x.medianRelError > 0.05).slice(0, 10).map((x) => (
@@ -176,16 +177,16 @@ export function ConsistencyView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Consistența ieșirilor pe FOV</h2>
-        <span className="sub">2.3 · ieșirile care descriu același moment concordă între ele și cu intrările?</span>
+        <h2>{tr("Consistența ieșirilor pe FOV")}</h2>
+        <span className="sub">{tr("2.3 · ieșirile care descriu același moment concordă între ele și cu intrările?")}</span>
       </div>
-      {fovs.length === 0 && <div className="callout warn">Niciun FOV detectat. Atribuie FOV-uri topicurilor în Inventar.</div>}
+      {fovs.length === 0 && <div className="callout warn">{tr("Niciun FOV detectat. Atribuie FOV-uri topicurilor în Inventar.")}</div>}
       {fovs.map((f) => (
         <Section key={f} title={`FOV ${f}`}>
-          <h4>Același moment: toate ieșirile prezente și publicate împreună?</h4>
+          <h4>{tr("Același moment: toate ieșirile prezente și publicate împreună?")}</h4>
           <FovGroupCard fov={f} />
           <hr />
-          <h4>Concordanță geometrică nor 3D ↔ imagine de adâncime</h4>
+          <h4>{tr("Concordanță geometrică nor 3D ↔ imagine de adâncime")}</h4>
           <CalibrationCard fov={f} />
         </Section>
       ))}

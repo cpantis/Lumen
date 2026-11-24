@@ -13,6 +13,7 @@ import { app, useApp, type Note } from "../state/store";
 import { traceLine } from "../state/trace";
 import { fmt, Section } from "../ui/primitives";
 import { bugMarkdown, openBugDraft, openNoteDraft } from "./bugs";
+import { tr } from "../i18n";
 
 export { BugEditor, openBugDraft, openNoteDraft } from "./bugs";
 
@@ -64,22 +65,22 @@ export function IssuesView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Bug-uri, note &amp; presupuneri</h2>
-        <span className="sub">2.6 · raportare în format de bug tracker · 2.7 · întrebări pentru dezvoltator · „State your assumptions explicitly”</span>
+        <h2>{tr("Bug-uri, note & presupuneri")}</h2>
+        <span className="sub">{tr("2.6 · raportare în format de bug tracker · 2.7 · întrebări pentru dezvoltator · „State your assumptions explicitly”")}</span>
       </div>
       <Section
-        title={`Bug-uri (${s.bugs.length})`}
+        title={`${tr("Bug-uri")} (${s.bugs.length})`}
         actions={
           <div className="row">
-            <button className="btn sm primary" onClick={() => openBugDraft()}><Plus size={14} /> Bug la momentul curent</button>
-            <button className="btn sm" onClick={exportZip} disabled={!s.bugs.length}><Download size={14} /> ZIP (Markdown + imagini)</button>
+            <button className="btn sm primary" onClick={() => openBugDraft()}><Plus size={14} /> {tr("Bug la momentul curent")}</button>
+            <button className="btn sm" onClick={exportZip} disabled={!s.bugs.length}><Download size={14} /> {tr("ZIP (Markdown + imagini)")}</button>
           </div>
         }
       >
-        {s.bugs.length === 0 && <p className="muted small">Niciun bug. Creează unul din bara de redare (buton „Bug”), dintr-o încălcare sau de aici.</p>}
+        {s.bugs.length === 0 && <p className="muted small">{tr("Niciun bug. Creează unul din bara de redare (buton „Bug”), dintr-o încălcare sau de aici.")}</p>}
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
-            <thead><tr><th>Severitate</th><th>Titlu</th><th>Cerință</th><th className="num">Când</th><th /></tr></thead>
+            <thead><tr><th>{tr("Severitate")}</th><th>{tr("Titlu")}</th><th>{tr("Cerință")}</th><th className="num">{tr("Când")}</th><th /></tr></thead>
             <tbody>
               {s.bugs.map((b) => (
                 <tr key={b.id}>
@@ -89,9 +90,9 @@ export function IssuesView() {
                   <td className="num"><button className="btn sm ghost" onClick={() => jumpTo(b.startNs, b.topics)}>{fmt.s(b.startNs)}</button></td>
                   <td>
                     <div className="row">
-                      <button className="btn sm" onClick={() => app.set({ bugDraft: b })}>editează</button>
+                      <button className="btn sm" onClick={() => app.set({ bugDraft: b })}>{tr("editează")}</button>
                       <button className="btn sm" onClick={() => download(`${b.id}.md`, bugMarkdown(b), "text/markdown")}>.md</button>
-                      <button className="btn sm icon ghost" aria-label="Șterge bug" onClick={() => confirm("Ștergi bug-ul?") && app.set((st) => ({ bugs: st.bugs.filter((x) => x.id !== b.id) }))}><Trash2 size={14} /></button>
+                      <button className="btn sm icon ghost" aria-label={tr("Șterge bug")} onClick={() => confirm("Ștergi bug-ul?") && app.set((st) => ({ bugs: st.bugs.filter((x) => x.id !== b.id) }))}><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -102,27 +103,27 @@ export function IssuesView() {
       </Section>
 
       <Section
-        title={`Note și întrebări (${s.notes.length})`}
-        sub="Ancorate în timp; prioritate 1 = cea mai mare. Exportul produce lista ordonată pentru discuția cu dezvoltatorul."
+        title={`${tr("Note și întrebări")} (${s.notes.length})`}
+        sub={tr("Ancorate în timp; prioritate 1 = cea mai mare. Exportul produce lista ordonată pentru discuția cu dezvoltatorul.")}
         actions={
           <div className="row">
-            <select className="input" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} aria-label="Filtru tag"><option value="">toate</option><option>întrebare</option><option>presupunere</option><option>anomalie</option><option>bookmark</option></select>
-            <button className="btn sm" onClick={openNoteDraft}><Plus size={14} /> Notă la momentul curent</button>
+            <select className="input" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} aria-label={tr("Filtru tag")}><option value="">{tr("toate")}</option><option>întrebare</option><option>presupunere</option><option>anomalie</option><option>bookmark</option></select>
+            <button className="btn sm" onClick={openNoteDraft}><Plus size={14} /> {tr("Notă la momentul curent")}</button>
             <button className="btn sm" onClick={exportNotes}><Download size={14} /> Markdown</button>
           </div>
         }
       >
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
-            <thead><tr><th className="num">Când</th><th>Tag</th><th>Prioritate</th><th>Text</th><th /></tr></thead>
+            <thead><tr><th className="num">{tr("Când")}</th><th>{tr("Tag")}</th><th>{tr("Prioritate")}</th><th>{tr("Text")}</th><th /></tr></thead>
             <tbody>
               {notes.map((n) => (
                 <tr key={n.id}>
                   <td className="num"><button className="btn sm ghost" onClick={() => jumpTo(n.t)}>{fmt.s(n.t)}</button></td>
-                  <td><select className="input" value={n.tag} onChange={(e) => setNote(n.id, { tag: e.target.value as Note["tag"] })} aria-label="Tag"><option>întrebare</option><option>presupunere</option><option>anomalie</option><option>bookmark</option></select></td>
-                  <td><select className="input" value={n.priority} onChange={(e) => setNote(n.id, { priority: +e.target.value as Note["priority"] })} aria-label="Prioritate"><option value={1}>P1</option><option value={2}>P2</option><option value={3}>P3</option></select></td>
-                  <td style={{ width: "60%" }}><input className="input" style={{ width: "100%" }} value={n.text} onChange={(e) => setNote(n.id, { text: e.target.value })} aria-label="Text notă" placeholder="De ce contează și ce ai face diferit în funcție de răspuns…" /></td>
-                  <td><button className="btn sm icon ghost" aria-label="Șterge nota" onClick={() => app.set((st) => ({ notes: st.notes.filter((x) => x.id !== n.id) }))}><Trash2 size={14} /></button></td>
+                  <td><select className="input" value={n.tag} onChange={(e) => setNote(n.id, { tag: e.target.value as Note["tag"] })} aria-label={tr("Tag")}><option>întrebare</option><option>presupunere</option><option>anomalie</option><option>bookmark</option></select></td>
+                  <td><select className="input" value={n.priority} onChange={(e) => setNote(n.id, { priority: +e.target.value as Note["priority"] })} aria-label={tr("Prioritate")}><option value={1}>P1</option><option value={2}>P2</option><option value={3}>P3</option></select></td>
+                  <td style={{ width: "60%" }}><input className="input" style={{ width: "100%" }} value={n.text} onChange={(e) => setNote(n.id, { text: e.target.value })} aria-label={tr("Text notă")} placeholder={tr("De ce contează și ce ai face diferit în funcție de răspuns…")} /></td>
+                  <td><button className="btn sm icon ghost" aria-label={tr("Șterge nota")} onClick={() => app.set((st) => ({ notes: st.notes.filter((x) => x.id !== n.id) }))}><Trash2 size={14} /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -130,16 +131,16 @@ export function IssuesView() {
         </div>
       </Section>
 
-      <Section title="Registrul de presupuneri" sub="Actualizat automat cu tot ce a presupus aplicația; adaugă și presupunerile tale.">
+      <Section title={tr("Registrul de presupuneri")} sub={tr("Actualizat automat cu tot ce a presupus aplicația; adaugă și presupunerile tale.")}>
         <ul className="small">
-          {autoAssumptions().map((x) => <li key={x}>{x} <span className="badge neutral">automat</span></li>)}
+          {autoAssumptions().map((x) => <li key={x}>{x} <span className="badge neutral">{tr("automat")}</span></li>)}
           {s.manualAssumptions.map((x, i) => (
-            <li key={i}>{x} <button className="btn sm ghost" onClick={() => app.set((st) => ({ manualAssumptions: st.manualAssumptions.filter((_, k) => k !== i) }))}>elimină</button></li>
+            <li key={i}>{x} <button className="btn sm ghost" onClick={() => app.set((st) => ({ manualAssumptions: st.manualAssumptions.filter((_, k) => k !== i) }))}>{tr("elimină")}</button></li>
           ))}
         </ul>
         <form className="row" onSubmit={(e) => { e.preventDefault(); if (newAssumption.trim()) { app.set((st) => ({ manualAssumptions: [...st.manualAssumptions, newAssumption.trim()] })); setNewAssumption(""); } }}>
-          <input className="input" style={{ flex: 1 }} value={newAssumption} onChange={(e) => setNewAssumption(e.target.value)} placeholder="ex. Camerele nu sunt sincronizate hardware" aria-label="Presupunere nouă" />
-          <button className="btn sm">Adaugă</button>
+          <input className="input" style={{ flex: 1 }} value={newAssumption} onChange={(e) => setNewAssumption(e.target.value)} placeholder={tr("ex. Camerele nu sunt sincronizate hardware")} aria-label={tr("Presupunere nouă")} />
+          <button className="btn sm">{tr("Adaugă")}</button>
         </form>
       </Section>
     </div>

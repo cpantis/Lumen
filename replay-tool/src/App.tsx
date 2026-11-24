@@ -1,5 +1,6 @@
 /** Root component: routes between start / loading / error and the analysis shell. */
-import { lazy, Suspense, useEffect } from "react";
+import { Fragment, lazy, Suspense, useEffect } from "react";
+import { useLang } from "./i18n";
 import { prefs } from "./state/actions";
 import { app, useApp } from "./state/store";
 import { BugEditor } from "./views/bugs";
@@ -63,6 +64,7 @@ function LazyViews() {
 export function App() {
   const phase = useApp((s) => s.phase);
   const view = useApp((s) => s.view);
+  const lang = useLang(); // keyed fragment below: re-render every tr() text on language change
   useShortcuts();
   useEffect(() => {
     const g = prefs.get().gapFactor;
@@ -81,7 +83,7 @@ export function App() {
     );
 
   return (
-    <>
+    <Fragment key={lang}>
       {phase === "start" && <StartScreen />}
       {phase === "loading" && <LoadingScreen />}
       {phase === "error" && <ErrorScreen />}
@@ -103,6 +105,6 @@ export function App() {
       <Toast />
       <LiveRegion />
       <TooltipLayer />
-    </>
+    </Fragment>
   );
 }

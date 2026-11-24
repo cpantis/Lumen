@@ -10,6 +10,7 @@ import { effectiveRole, jumpTo, results } from "../state/actions";
 import { app, useApp } from "../state/store";
 import { Plot } from "../ui/Plot";
 import { fmt, Kv, Section, Stat, StatusBadge, verdictKind } from "../ui/primitives";
+import { tr, trField } from "../i18n";
 
 export function SafetyView() {
   const s = useApp((st) => st);
@@ -43,30 +44,30 @@ export function SafetyView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Ce înseamnă pentru utilizator</h2>
-        <span className="sub">2.5 · ochelarii ghidează o persoană nevăzătoare care merge — fiecare milisecundă devine distanță parcursă fără informație</span>
+        <h2>{tr("Ce înseamnă pentru utilizator")}</h2>
+        <span className="sub">{tr("2.5 · ochelarii ghidează o persoană nevăzătoare care merge — fiecare milisecundă devine distanță parcursă fără informație")}</span>
       </div>
-      <Section title="Viteza de mers">
+      <Section title={tr("Viteza de mers")}>
         <div className="stats" style={{ marginBottom: 12 }}>
           <Stat value={`${speed.toFixed(2)} m/s`} label={s.speedOverride ? "viteză (editată manual)" : motion.method === "imu-steps" ? "viteză estimată din IMU" : "viteză presupusă"} />
-          <Stat value={Number.isFinite(motion.cadenceHz) ? `${motion.cadenceHz.toFixed(2)} pași/s` : "—"} label="cadență" />
-          <Stat value={motion.stepTimes.length} label="pași detectați" />
-          <Stat value={motion.confidence} label="încredere" />
+          <Stat value={Number.isFinite(motion.cadenceHz) ? `${motion.cadenceHz.toFixed(2)} pași/s` : "—"} label={tr("cadență")} />
+          <Stat value={motion.stepTimes.length} label={tr("pași detectați")} />
+          <Stat value={motion.confidence} label={tr("încredere")} />
         </div>
         <p className="small">{motion.note}</p>
         <div className="row wrap" style={{ alignItems: "flex-end", marginBottom: 12 }}>
-          <label className="field">viteză folosită (m/s)<input className="input mono" type="number" step={0.05} min={0.1} value={speed.toFixed(2)} onChange={(e) => app.set({ speedOverride: +e.target.value })} style={{ width: 120 }} /></label>
-          <label className="field">lungime pas presupusă (m)<input className="input mono" type="number" step={0.05} min={0.3} value={s.stepLengthM} onChange={(e) => app.set({ stepLengthM: +e.target.value, speedOverride: undefined })} style={{ width: 120 }} /></label>
-          <button className="btn sm ghost" onClick={() => app.set({ speedOverride: undefined })}>folosește estimarea</button>
-          <button className="btn sm ghost" onClick={() => app.set({ speedOverride: DEFAULT_SPEED_MPS })}>1,4 m/s (tipic)</button>
+          <label className="field">{tr("viteză folosită (m/s)")}<input className="input mono" type="number" step={0.05} min={0.1} value={speed.toFixed(2)} onChange={(e) => app.set({ speedOverride: +e.target.value })} style={{ width: 120 }} /></label>
+          <label className="field">{tr("lungime pas presupusă (m)")}<input className="input mono" type="number" step={0.05} min={0.3} value={s.stepLengthM} onChange={(e) => app.set({ stepLengthM: +e.target.value, speedOverride: undefined })} style={{ width: 120 }} /></label>
+          <button className="btn sm ghost" onClick={() => app.set({ speedOverride: undefined })}>{tr("folosește estimarea")}</button>
+          <button className="btn sm ghost" onClick={() => app.set({ speedOverride: DEFAULT_SPEED_MPS })}>{tr("1,4 m/s (tipic)")}</button>
         </div>
-        {imu && <Plot x={imu.log} series={imuS} time height={140} shade={steps} title="Pași detectați (benzi) pe |a| din IMU" />}
+        {imu && <Plot x={imu.log} series={imuS} time height={140} shade={steps} title={tr("Pași detectați (benzi) pe |a| din IMU")} />}
       </Section>
 
-      <Section title="Timp → distanță, pentru fiecare ieșire" sub={`La ${speed.toFixed(2)} m/s. „Orb” = distanța parcursă fără o ieșire nouă.`}>
+      <Section title={tr("Timp → distanță, pentru fiecare ieșire")} sub={`La ${speed.toFixed(2)} m/s. „Orb” = distanța parcursă fără o ieșire nouă.`}>
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
-            <thead><tr><th>Ieșire</th><th className="num">Între două ieșiri (mediană)</th><th className="num">Cel mai lung gol → distanță oarbă</th><th className="num">Latență p50 → distanță</th><th className="num">Latență p95</th><th className="num">Latență max</th></tr></thead>
+            <thead><tr><th>{tr("Ieșire")}</th><th className="num">{tr("Între două ieșiri (mediană)")}</th><th className="num">{tr("Cel mai lung gol → distanță oarbă")}</th><th className="num">{tr("Latență p50 → distanță")}</th><th className="num">{tr("Latență p95")}</th><th className="num">{tr("Latență max")}</th></tr></thead>
             <tbody>
               {outputs.map((o) => {
                 const e = a.edges.filter((x) => x.output === o.topic && x.kind === "exact").sort((x, y) => y.matchRate - x.matchRate)[0];
@@ -88,20 +89,20 @@ export function SafetyView() {
         <Kv items={[["Referință", "un obstacol raportat cu latența L e la o distanță mai mică cu v·L decât arată ieșirea; un gol G înseamnă v·G metri fără percepție nouă"]]} />
       </Section>
 
-      <Section title={`Cerințe critice pentru siguranță — profil ${s.profile === "strict" ? "Strict" : "Derivat"}`}>
+      <Section title={`${tr("Cerințe critice pentru siguranță — profil")} ${s.profile === "strict" ? tr("Strict") : tr("Derivat")}`}>
         <div className="table-wrap" tabIndex={0}>
           <table className="t">
-            <thead><tr><th>ID</th><th>Cerință</th><th>Verdict</th><th>De ce contează</th></tr></thead>
-            <tbody>{safety.map((r) => <tr key={r.id}><td className="mono">{r.id}</td><td>{r.title}</td><td><StatusBadge kind={verdictKind(r.verdict)} /></td><td className="small">{r.rationale}</td></tr>)}</tbody>
+            <thead><tr><th>{tr("ID")}</th><th>{tr("Cerință")}</th><th>{tr("Verdict")}</th><th>{tr("De ce contează")}</th></tr></thead>
+            <tbody>{safety.map((r) => <tr key={r.id}><td className="mono">{r.id}</td><td>{trField(r.title, r.title_en)}</td><td><StatusBadge kind={verdictKind(r.verdict)} /></td><td className="small">{r.rationale}</td></tr>)}</tbody>
           </table>
         </div>
         <p className="small muted" style={{ marginTop: 8 }}>„Utile” (nu critice): {other.map((r) => r.id).join(", ")}</p>
       </Section>
 
-      <Section title="Cele mai grave momente" sub="Ordonate după distanța parcursă „orbește” (gol de ieșire sau latență mare). Click → salt în replay.">
+      <Section title={tr("Cele mai grave momente")} sub={tr("Ordonate după distanța parcursă „orbește” (gol de ieșire sau latență mare). Click → salt în replay.")}>
         <div className="table-wrap" tabIndex={0} style={{ maxHeight: 420 }}>
           <table className="t">
-            <thead><tr><th className="num">#</th><th className="num">Când</th><th className="num">Durată</th><th className="num">Distanță</th><th>Ce s-a întâmplat</th></tr></thead>
+            <thead><tr><th className="num">#</th><th className="num">{tr("Când")}</th><th className="num">{tr("Durată")}</th><th className="num">{tr("Distanță")}</th><th>{tr("Ce s-a întâmplat")}</th></tr></thead>
             <tbody>
               {worst.map((w, i) => (
                 <tr key={i} className="clickable" onClick={() => jumpTo(w.t, w.topics)}>

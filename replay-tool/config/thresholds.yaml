@@ -29,6 +29,7 @@ assumptions:
 requirements:
   - id: REQ-IN-01
     title: Intrările de cameră sunt publicate la o frecvență constantă
+    title_en: Camera inputs are published at a constant rate
     kind: rate_min
     select: { role: input, type: "Image|CompressedImage" }
     safety: true
@@ -39,6 +40,7 @@ requirements:
 
   - id: REQ-OUT-01
     title: Fiecare ieșire este publicată cu o frecvență minimă
+    title_en: Every output is published at a minimum rate
     kind: rate_min
     select: { role: output }
     safety: true
@@ -49,6 +51,7 @@ requirements:
 
   - id: REQ-OUT-02
     title: Niciun gol între două ieșiri consecutive nu depășește limita
+    title_en: No gap between two consecutive outputs exceeds the limit
     kind: gap_max
     select: { role: output }
     safety: true
@@ -59,6 +62,7 @@ requirements:
 
   - id: REQ-LAT-01
     title: Latența cap-coadă (stamp intrare → publicare ieșire) este limitată
+    title_en: End-to-end latency (input stamp → output publication) is bounded
     kind: latency
     select: { role: output }
     safety: true
@@ -69,6 +73,7 @@ requirements:
 
   - id: REQ-TRACE-01
     title: Fiecare ieșire poartă stamp-ul cadrului de intrare din care provine
+    title_en: Every output carries the stamp of the input frame it was produced from
     kind: match_min
     select: { role: output }
     safety: false
@@ -79,6 +84,7 @@ requirements:
 
   - id: REQ-DROP-01
     title: Componenta nu sare cadre de intrare
+    title_en: The component does not skip input frames
     kind: drop_max
     select: { role: output }
     safety: true
@@ -89,6 +95,7 @@ requirements:
 
   - id: REQ-CONT-01
     title: Ieșirile nu sunt goale
+    title_en: Outputs are not empty
     kind: empty_max
     select: { role: output }
     safety: true
@@ -99,6 +106,7 @@ requirements:
 
   - id: REQ-CONT-02
     title: Mesajele sunt valide structural și decodabile
+    title_en: Messages are structurally valid and decodable
     kind: invalid_max
     select: {}
     safety: true
@@ -109,6 +117,7 @@ requirements:
 
   - id: REQ-CONT-03
     title: Proporția de valori NaN/Inf per mesaj de ieșire este limitată
+    title_en: The NaN/Inf ratio per output message is bounded
     kind: nan_max
     select: { role: output }
     safety: false
@@ -119,6 +128,7 @@ requirements:
 
   - id: REQ-CONT-04
     title: Acoperirea (valori valide) per mesaj de ieșire este suficientă
+    title_en: Coverage (valid values) per output message is sufficient
     kind: valid_min
     select: { role: output }
     safety: true
@@ -129,6 +139,7 @@ requirements:
 
   - id: REQ-CONT-05
     title: Valorile sunt în intervale fizic plauzibile
+    title_en: Values are within physically plausible ranges
     kind: out_of_range_max
     select: {}
     safety: false
@@ -139,6 +150,7 @@ requirements:
 
   - id: REQ-CONT-06
     title: Ieșirile nu îngheață (cadre identice repetate)
+    title_en: Outputs do not freeze (identical repeated frames)
     kind: duplicate_max
     select: { role: output }
     safety: true
@@ -149,6 +161,7 @@ requirements:
 
   - id: REQ-CLK-01
     title: header.stamp este monoton crescător și nu vine din viitor
+    title_en: header.stamp is monotonically increasing and not in the future
     kind: stamp_monotonic
     select: {}
     safety: false
@@ -159,6 +172,7 @@ requirements:
 
   - id: REQ-CLK-02
     title: Întârzierea de transport a intrărilor (log_time − stamp) este limitată
+    title_en: Input transport delay (log_time − stamp) is bounded
     kind: clock_offset_max
     select: { role: input }
     safety: false
@@ -169,6 +183,7 @@ requirements:
 
   - id: REQ-FOV-01
     title: Ieșirile aceluiași FOV descriu același moment și apar împreună
+    title_en: Outputs of the same FOV describe the same moment and appear together
     kind: fov_sync
     select: {}
     safety: false

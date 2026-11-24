@@ -22,7 +22,7 @@ Deschide apoi http://localhost:5173 și apasă **„Deschide înregistrarea demo
 | `npm run build` | site static în `dist/` (typecheck + Vite) |
 | `npm test` | 49 de teste unitare, de integrare și de compatibilitate (Vitest) |
 | `npm run conformance` | cele 416 fișiere oficiale de conformitate MCAP |
-| `npm run test:e2e` | 7 teste Playwright, inclusiv audit de accesibilitate axe-core în ambele teme |
+| `npm run test:e2e` | 15 teste Playwright: fluxurile principale, fiecare export (PNG, WebM, CSV, Markdown, raport JSON, ZIP de bug-uri), modul telefon, interfața EN și audit de accesibilitate axe-core în ambele teme |
 | `npm run test:all` | typecheck + unit + build + e2e |
 | `npm run inspect -- fișier.mcap [--schemas]` | inspectează o înregistrare reală: topicuri, tipuri, scheme, statistici, cauzalitate |
 | `npm run metrics -- fișier.mcap --out out/` | `metrics.json`, `report-derived.json`, `report-strict.json`; codul de ieșire e 1 dacă profilul derivat are eșecuri |
@@ -150,6 +150,13 @@ Defectele injectate, pe care testele verifică faptul că aplicația le găseșt
 
 Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←/→` cu ±1 s, `[ ]` schimbă viteza, `A/B` pun cursoarele, `L` pornește bucla, `N` adaugă o notă, `I` deschide inspectorul, `Ctrl/⌘+K` paleta de comenzi, `1–8` comută vederile, `?` deschide ajutorul.
 
+## Interfață, performanță, confidențialitate
+
+- **Limbă:** română (implicit) sau engleză, din Setări. Traducerile sunt în `src/i18n/en.ts`. Dovezile generate de analiză (motivele clasificării, mesajele de încălcare) rămân în română.
+- **Tabletă și telefon** (≤ 900 px): replay-ul afișează un singur panou, cu selector, și o singură coloană care se derulează vertical.
+- **Încărcare:** vederile, three.js și uPlot se încarcă la nevoie; codul inițial are ~125 KB comprimat.
+- **Fără cereri către terți:** fonturile Poppins și JetBrains Mono sunt incluse în aplicație (`@fontsource`, cu subsetul latin-ext pentru ă, ș, ț). `vercel.json` setează o politică CSP care permite doar resursele proprii.
+
 ## Limitări cunoscute și presupuneri
 
 - Cauzalitatea se dovedește doar prin `header.stamp` identic. O componentă care nu copiază stamp-ul intrării nu poate fi legată automat de intrarea ei; rolul se setează atunci manual în Inventar.
@@ -157,6 +164,7 @@ Scurtături: `Space` redă sau oprește, `←/→` mută cu un cadru, `Shift+←
 - YUV 4:2:2 e afișat doar ca luminanță. Imaginile comprimate sunt decodate de browser (JPEG/PNG).
 - Estimarea calibrării are nevoie de o ieșire de adâncime ca referință pentru același stamp. Fără ea se folosește doar procentul de puncte care cad în imagine.
 - Detecția pașilor presupune o lungime a pasului de 0,7 m, editabilă.
+- `flatbuffer` și `capnproto` nu sunt decodate; `foxglove.CompressedVideo` (H.264/H.265) nu e redat ca imagine; `pose`-ul unui `foxglove.PointCloud` nu e aplicat; imaginile Bayer sunt afișate fără reconstrucția culorilor.
 - Pentru fișiere neindexate sau trunchiate, mesajele sunt citite secvențial și ținute în memorie.
 - Alternativa propusă în prompt (backend Python) nu a fost necesară: citirea indexată din `Blob` și worker-ul fac față fișierelor mari în browser.
 

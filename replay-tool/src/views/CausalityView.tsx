@@ -15,6 +15,7 @@ import { app, toast, useApp } from "../state/store";
 import { traceLine } from "../state/trace";
 import { Plot } from "../ui/Plot";
 import { fmt, Kv, Section, Stat } from "../ui/primitives";
+import { tr } from "../i18n";
 
 function Diagram() {
   const s = useApp((st) => st);
@@ -26,7 +27,7 @@ function Diagram() {
     return topicColor(t, s);
   };
   return (
-    <svg className="diagram" viewBox={`0 0 ${L.width} ${L.height}`} width="100%" role="img" aria-label="Diagrama I/O a componentei, dedusă din potrivirea header.stamp" style={{ maxHeight: 640 }}>
+    <svg className="diagram" viewBox={`0 0 ${L.width} ${L.height}`} width="100%" role="img" aria-label={tr("Diagrama I/O a componentei, dedusă din potrivirea header.stamp")} style={{ maxHeight: 640 }}>
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)" />
@@ -47,8 +48,8 @@ function Diagram() {
         );
       })}
       <rect x={L.component.x} y={L.component.y} width={L.component.w} height={L.component.h} rx={50} fill="var(--surface-2)" stroke="var(--accent)" strokeWidth={1.5} />
-      <text x={L.component.x + L.component.w / 2} y={L.component.y + 44} textAnchor="middle" fontSize={14}>Componentă</text>
-      <text x={L.component.x + L.component.w / 2} y={L.component.y + 64} textAnchor="middle" fontSize={11} fill="var(--text-muted)">(nedocumentată)</text>
+      <text x={L.component.x + L.component.w / 2} y={L.component.y + 44} textAnchor="middle" fontSize={14}>{tr("Componentă")}</text>
+      <text x={L.component.x + L.component.w / 2} y={L.component.y + 64} textAnchor="middle" fontSize={11} fill="var(--text-muted)">{tr("(nedocumentată)")}</text>
       {L.nodes.map((n) => (
         <g key={n.topic} transform={`translate(${n.x},${n.y})`} style={{ cursor: "pointer" }} onClick={() => app.set({ view: "inventory" })}>
           <rect width={nodeW} height={nodeH} rx={8} fill="var(--surface)" stroke="var(--border-strong)" />
@@ -57,8 +58,8 @@ function Diagram() {
           <text x={12} y={35} fontSize={10} fill="var(--text-muted)">{n.sub}{n.fov ? ` · FOV ${n.fov}` : ""}</text>
         </g>
       ))}
-      <text x={20} y={20} fontSize={11} fill="var(--text-muted)">INTRĂRI</text>
-      <text x={L.width - 300} y={20} fontSize={11} fill="var(--text-muted)">IEȘIRI (grupate pe FOV)</text>
+      <text x={20} y={20} fontSize={11} fill="var(--text-muted)">{tr("INTRĂRI")}</text>
+      <text x={L.width - 300} y={20} fontSize={11} fill="var(--text-muted)">{tr("IEȘIRI (grupate pe FOV)")}</text>
     </svg>
   );
 }
@@ -67,7 +68,7 @@ function ABTool() {
   const s = useApp((st) => st);
   const a = s.analysis!;
   if (s.markA === undefined || s.markB === undefined)
-    return <p className="muted small">Setează cursoarele A și B (butoanele A/B din bara de redare sau tastele A/B) pentru a măsura un interval.</p>;
+    return <p className="muted small">{tr("Setează cursoarele A și B (butoanele A/B din bara de redare sau tastele A/B) pentru a măsura un interval.")}</p>;
   const lo = Math.min(s.markA, s.markB), hi = Math.max(s.markA, s.markB);
   const rowsAB = a.topics.map((t) => {
     const i0 = lastAtOrBefore(t.log, lo - 1) + 1;
@@ -79,15 +80,15 @@ function ABTool() {
   return (
     <div>
       <div className="row wrap" style={{ marginBottom: 8 }}>
-        <Stat value={fmt.ms(hi - lo)} label="Δt A–B" />
+        <Stat value={fmt.ms(hi - lo)} label={tr("Δt A–B")} />
         <span className="spacer" />
         <button className="btn sm" onClick={() => navigator.clipboard.writeText(text).then(() => toast("Măsurătoare copiată"))}>
-          <Copy size={14} /> Copiază ca text
+          <Copy size={14} /> {tr("Copiază ca text")}
         </button>
       </div>
       <div className="table-wrap" tabIndex={0} style={{ maxHeight: 260 }}>
         <table className="t">
-          <thead><tr><th>Topic</th><th className="num">Mesaje în interval</th><th className="num">Frecvență în interval</th></tr></thead>
+          <thead><tr><th>{tr("Topic")}</th><th className="num">{tr("Mesaje în interval")}</th><th className="num">{tr("Frecvență în interval")}</th></tr></thead>
           <tbody>{rowsAB.map((r) => <tr key={r.topic}><td className="mono">{r.topic}</td><td className="num">{r.count}</td><td className="num">{fmt.hz(r.hz)}</td></tr>)}</tbody>
         </table>
       </div>
@@ -111,7 +112,7 @@ function RequirementsDraft() {
   const headers: Array<[string, string]> = [["id", "ID"], ["stmt", "Cerință"], ["crit", "Criteriu de acceptare (derivat)"], ["strict", "Criteriu strict"], ["verif", "Metodă de verificare"], ["safety", "Siguranță"]];
   return (
     <>
-      <p className="muted small">Pragurile „derivate” sunt propuse din măsurători (ce face componenta azi, cu o marjă mică). Decizia finală aparține inginerului — aplică-le sau editează YAML-ul în „Cerințe &amp; teste”.</p>
+      <p className="muted small">{tr("Pragurile „derivate” sunt propuse din măsurători (ce face componenta azi, cu o marjă mică). Decizia finală aparține inginerului — aplică-le sau editează YAML-ul în „Cerințe & teste”.")}</p>
       <div className="table-wrap" tabIndex={0} style={{ maxHeight: 360 }}>
         <table className="t">
           <thead><tr>{headers.map(([, h]) => <th key={h}>{h}</th>)}</tr></thead>
@@ -126,7 +127,7 @@ function RequirementsDraft() {
           <Download size={14} /> YAML
         </button>
         <button className="btn sm primary" onClick={() => { setThresholdsText(dumpThresholds(proposed)); toast("Pragurile derivate propuse au fost aplicate"); }}>
-          Aplică pragurile propuse
+          {tr("Aplică pragurile propuse")}
         </button>
       </div>
     </>
@@ -158,12 +159,12 @@ export function CausalityView() {
   return (
     <div className="view" id="main-content">
       <div className="view-title">
-        <h2>Cauzalitate &amp; latență</h2>
-        <span className="sub">2.2 · ce intrări produc ce ieșiri — dovedit prin potrivirea exactă a header.stamp, nu presupus</span>
+        <h2>{tr("Cauzalitate & latență")}</h2>
+        <span className="sub">{tr("2.2 · ce intrări produc ce ieșiri — dovedit prin potrivirea exactă a header.stamp, nu presupus")}</span>
       </div>
       <Section
-        title="Diagrama I/O a componentei"
-        sub="Săgeata înseamnă: ≥ 50 % din stamp-urile ieșirii sunt copiate exact din intrare, iar ieșirea e publicată după ea. Procentul = rata de potrivire; p50 = latența mediană."
+        title={tr("Diagrama I/O a componentei")}
+        sub={tr("Săgeata înseamnă: ≥ 50 % din stamp-urile ieșirii sunt copiate exact din intrare, iar ieșirea e publicată după ea. Procentul = rata de potrivire; p50 = latența mediană.")}
         actions={
           <div className="row">
             <button className="btn sm" onClick={() => download("diagrama-io.mmd", mermaidDiagram(a, (t) => effectiveRole(t, s), (t) => effectiveFov(t, s)), "text/plain")}><Download size={14} /> Mermaid</button>
@@ -171,14 +172,14 @@ export function CausalityView() {
           </div>
         }
       >
-        {a.edges.length ? <Diagram /> : <div className="callout warn">Nicio ieșire nu copiază stamp-urile unei intrări: cauzalitatea nu poate fi dovedită din stamp-uri. Clasifică manual topicurile în Inventar.</div>}
+        {a.edges.length ? <Diagram /> : <div className="callout warn">{tr("Nicio ieșire nu copiază stamp-urile unei intrări: cauzalitatea nu poate fi dovedită din stamp-uri. Clasifică manual topicurile în Inventar.")}</div>}
       </Section>
 
-      <Section title="Latență și cadre sărite, pe perechi intrare → ieșire">
+      <Section title={tr("Latență și cadre sărite, pe perechi intrare → ieșire")}>
         <div className="table-wrap" tabIndex={0} style={{ maxHeight: 300 }}>
           <table className="t">
             <thead>
-              <tr><th>Intrare → ieșire</th><th className="num">Potrivire</th><th className="num">p50</th><th className="num">p90</th><th className="num">p95</th><th className="num">p99</th><th className="num">max</th><th className="num">Cadre sărite</th><th className="num">Secv. max</th><th className="num">Rată ieșire / intrare</th></tr>
+              <tr><th>{tr("Intrare → ieșire")}</th><th className="num">{tr("Potrivire")}</th><th className="num">p50</th><th className="num">p90</th><th className="num">p95</th><th className="num">p99</th><th className="num">max</th><th className="num">{tr("Cadre sărite")}</th><th className="num">{tr("Secv. max")}</th><th className="num">{tr("Rată ieșire / intrare")}</th></tr>
             </thead>
             <tbody>
               {exact.map((x, i) => {
@@ -204,11 +205,11 @@ export function CausalityView() {
         {e && out && inp && (
           <>
             <div className="callout" style={{ marginTop: 16 }}>
-              <b>Definiția latenței afișate:</b> latență = <code>log_time(ieșire) − header.stamp(intrarea potrivită exact)</code> — timpul de la achiziția cadrului până la publicarea rezultatului (cap-coadă). A doua curbă, <code>log_time(ieșire) − log_time(intrare)</code>, exclude transportul intrării. Măsurată pe {e.matched} ieșiri potrivite din {e.outputs}.
+              <b>{tr("Definiția latenței afișate:")}</b> {tr("latență =")} <code>log_time(ieșire) − header.stamp(intrarea potrivită exact)</code> {tr("— timpul de la achiziția cadrului până la publicarea rezultatului (cap-coadă). A doua curbă,")} <code>log_time(ieșire) − log_time(intrare)</code>, exclude transportul intrării. Măsurată pe {e.matched} ieșiri potrivite din {e.outputs}.
             </div>
             <div className="grid-2">
-              <Plot x={hx} series={hs} bars height={200} xLabel="latență (ms)" title="Distribuția latenței" csvName="latenta_hist" />
-              <Plot x={out.log} series={ts} time height={200} thresholds={th} title="Latența în timp (click → salt)" csvName="latenta_timp" />
+              <Plot x={hx} series={hs} bars height={200} xLabel={tr("latență (ms)")} title={tr("Distribuția latenței")} csvName="latenta_hist" />
+              <Plot x={out.log} series={ts} time height={200} thresholds={th} title={tr("Latența în timp (click → salt)")} csvName="latenta_timp" />
             </div>
             <h4 style={{ marginTop: 16 }}>Secvențe de cadre de intrare fără ieșire ({e.droppedInputs.length} cadre, {e.dropRuns.length} secvențe)</h4>
             <div className="row wrap">
@@ -217,18 +218,18 @@ export function CausalityView() {
                   {len} cadre @ {fmt.s(st, 2)}
                 </button>
               ))}
-              {e.dropRuns.length === 0 && <span className="muted small">Niciun cadru sărit în intervalul activ al ieșirii.</span>}
+              {e.dropRuns.length === 0 && <span className="muted small">{tr("Niciun cadru sărit în intervalul activ al ieșirii.")}</span>}
             </div>
             <Kv items={[["perioadă intrare (mediană)", fmt.ms(inp.rate.medianPeriodNs)], ["perioadă ieșire (mediană)", fmt.ms(out.rate.medianPeriodNs)], ["latență log→log (mediană)", fmt.ms(summarize(e.latencyFromLog).p50)]]} />
           </>
         )}
       </Section>
 
-      <Section title="Măsurare între cursoarele A și B">
+      <Section title={tr("Măsurare între cursoarele A și B")}>
         <ABTool />
       </Section>
 
-      <Section title="Ciornă de cerințe (din măsurători)">
+      <Section title={tr("Ciornă de cerințe (din măsurători)")}>
         <RequirementsDraft />
       </Section>
     </div>

@@ -12,6 +12,7 @@ import { fmt } from "../ui/primitives";
 import { PanelFrame } from "./PanelFrame";
 import { axesAt, clearGroup, makePoints, useScene3D, type SceneApi } from "./Scene3D";
 import { useDecoded, usePanelIndex } from "./useMessage";
+import { tr } from "../i18n";
 
 export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }) {
   const { index } = usePanelIndex(topic);
@@ -55,14 +56,14 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       error={msg?.error}
       toolbar={
         <>
-          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label="Colorare după câmp" value={field} onChange={(e) => setField(e.target.value)}>
+          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label={tr("Colorare după câmp")} value={field} onChange={(e) => setField(e.target.value)}>
             {[...info.fields, "distanță"].map((f) => (
               <option key={f} value={f}>
                 culoare: {f}
               </option>
             ))}
           </select>
-          <input type="range" min={0.01} max={0.3} step={0.01} value={size} onChange={(e) => setSize(+e.target.value)} aria-label="Dimensiunea punctelor" data-tip="Dimensiunea punctelor" style={{ width: 60 }} />
+          <input type="range" min={0.01} max={0.3} step={0.01} value={size} onChange={(e) => setSize(+e.target.value)} aria-label={tr("Dimensiunea punctelor")} data-tip={tr("Dimensiunea punctelor")} style={{ width: 60 }} />
         </>
       }
       footer={
@@ -74,7 +75,7 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       }
     >
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
-      {index < 0 && <div className="panel-empty">Niciun mesaj până la acest moment</div>}
+      {index < 0 && <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div>}
     </PanelFrame>
   );
 }

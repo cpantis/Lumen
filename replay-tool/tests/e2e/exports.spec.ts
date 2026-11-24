@@ -112,3 +112,23 @@ test.describe("compact mode on a phone", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   });
 });
+
+test("English interface (language switch)", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true, lang: "en" })));
+  await page.reload();
+  await expect(page.getByText("Project for the dotLumen SW Test Challenge")).toBeVisible();
+  await page.getByTestId("demo").click();
+  await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("tab", { name: "Inventory" }).click();
+  await expect(page.getByRole("heading", { name: "Recording inventory" })).toBeVisible();
+  await page.getByRole("tab", { name: /Requirements/ }).click();
+  await expect(page.getByRole("heading", { name: "Requirements & tests" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Results — profile Derived" }).getByRole("columnheader", { name: "Requirement" })).toBeVisible();
+  await page.getByRole("tab", { name: "Safety" }).click();
+  await expect(page.getByRole("heading", { name: "What it means for the user" })).toBeVisible();
+  // switch back to Romanian from the settings dialog
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Language").selectOption("ro");
+  await expect(page.getByRole("heading", { name: "Ce înseamnă pentru utilizator" })).toBeVisible();
+});

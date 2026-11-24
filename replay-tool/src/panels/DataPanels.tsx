@@ -12,6 +12,7 @@ import { Kv } from "../ui/primitives";
 import { PanelFrame } from "./PanelFrame";
 import { useDecoded, usePanelIndex } from "./useMessage";
 import { quatToRpy } from "../core/projection";
+import { tr } from "../i18n";
 
 /** Fetches a numeric series for (topic, path) once and caches it module-wide. */
 const seriesCache = new Map<string, Promise<{ t: Float64Array; v: Float64Array; truncated: boolean }>>();
@@ -70,7 +71,7 @@ export function ImuPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData })
       topic={topic}
       index={index}
       toolbar={
-        <div className="btn-group" role="group" aria-label="Mărime IMU">
+        <div className="btn-group" role="group" aria-label={tr("Mărime IMU")}>
           {(["acc", "gyro", "rpy"] as const).map((m) => (
             <button key={m} className="btn sm" aria-pressed={mode === m} onClick={() => setMode(m)}>
               {m === "acc" ? "accel" : m === "gyro" ? "gyro" : "rpy"}
@@ -138,8 +139,8 @@ export function GridPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
     ctx.putImageData(img, 0, 0);
   }, [msg]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>gri = necunoscut, negru = ocupat</span>}>
-      <canvas ref={canvas} style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated" }} role="img" aria-label="Grilă de ocupare" />
+    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tr("gri = necunoscut, negru = ocupat")}</span>}>
+      <canvas ref={canvas} style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated" }} role="img" aria-label={tr("Grilă de ocupare")} />
     </PanelFrame>
   );
 }
@@ -167,7 +168,7 @@ export function ScanPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
   }, [msg]);
   return (
     <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error}>
-      <canvas ref={canvas} role="img" aria-label="Scanare laser" />
+      <canvas ref={canvas} role="img" aria-label={tr("Scanare laser")} />
     </PanelFrame>
   );
 }
@@ -227,9 +228,9 @@ export function GenericPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicDat
   const { index } = usePanelIndex(topic);
   const { msg } = useDecoded(topic.topic, index);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>apasă ⌁ lângă un câmp numeric pentru grafic în timp</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tr("apasă ⌁ lângă un câmp numeric pentru grafic în timp")}</span>}>
       <div className="panel-body scroll json" tabIndex={0} style={{ position: "absolute", inset: 0, padding: 8 }}>
-        {msg?.msg !== undefined ? <JsonTree value={msg.msg} topic={topic.topic} /> : index < 0 ? <div className="panel-empty">Niciun mesaj până la acest moment</div> : null}
+        {msg?.msg !== undefined ? <JsonTree value={msg.msg} topic={topic.topic} /> : index < 0 ? <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div> : null}
       </div>
     </PanelFrame>
   );
@@ -240,7 +241,7 @@ export function PlotPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
   const data = useSeries(topic.topic, [cfg.path ?? ""]);
   const series = useMemo(() => (data ? [{ label: cfg.path ?? "", color: "var(--accent)", values: data[0].v }] : undefined), [data, cfg.path]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} title={`${cfg.topic} · ${cfg.path}`} footer={data?.[0].truncated ? <span>eșantionat pentru afișare (metricile folosesc datele complete)</span> : null}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} title={`${cfg.topic} · ${cfg.path}`} footer={data?.[0].truncated ? <span>{tr("eșantionat pentru afișare (metricile folosesc datele complete)")}</span> : null}>
       <div className="panel-body scroll" tabIndex={0} style={{ position: "absolute", inset: 0, padding: 4 }}>
         {data && series ? <Plot x={data[0].t} series={series} time height={180} csvName={`${topic.topic.replace(/\W/g, "_")}_${(cfg.path ?? "").replace(/\W/g, "_")}`} /> : <div className="skeleton" style={{ height: 160 }} />}
       </div>

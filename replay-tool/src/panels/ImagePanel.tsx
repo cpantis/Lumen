@@ -11,6 +11,7 @@ import { indexAt } from "../state/actions";
 import { useApp, useClock, type PanelConfig } from "../state/store";
 import { PanelFrame } from "./PanelFrame";
 import { useDecoded, usePanelIndex } from "./useMessage";
+import { tr } from "../i18n";
 
 /** Draws an RGBA buffer or bitmap into a canvas, letter-boxed to the container. */
 export function drawImageFit(canvas: HTMLCanvasElement, src: { rgba?: Uint8ClampedArray; bitmap?: ImageBitmap; width?: number; height?: number }): { scale: number; ox: number; oy: number } | undefined {
@@ -106,7 +107,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       error={msg?.error}
       toolbar={
         isDepthTopic ? (
-          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label="Colormap adâncime" value={cmap} onChange={(e) => setCmap(e.target.value as Colormap)}>
+          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label={tr("Colormap adâncime")} value={cmap} onChange={(e) => setCmap(e.target.value as Colormap)}>
             <option value="turbo">turbo</option>
             <option value="viridis">viridis</option>
             <option value="inferno">inferno</option>
@@ -122,8 +123,8 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
         </>
       }
     >
-      {index < 0 && !matchedFrom && <div className="panel-empty">Niciun mesaj până la acest moment</div>}
-      {index < 0 && matchedFrom && <div className="panel-empty">Ieșirea curentă nu are un cadru de intrare corespunzător</div>}
+      {index < 0 && !matchedFrom && <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div>}
+      {index < 0 && matchedFrom && <div className="panel-empty">{tr("Ieșirea curentă nu are un cadru de intrare corespunzător")}</div>}
       <canvas ref={canvas} onMouseMove={onMove} onMouseLeave={() => setReadout("")} aria-label={`Imagine ${topic.topic}`} role="img" />
       {isDepthTopic && (
         <div className="row xs" style={{ position: "absolute", left: 8, bottom: 6, background: "var(--surface)", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--border)" }} onMouseDown={(e) => e.stopPropagation()}>
@@ -132,9 +133,9 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
           </label>
           {!autoRange && (
             <>
-              <input className="input mono" style={{ width: 54, minHeight: 22, padding: "0 4px" }} type="number" step="0.1" aria-label="adâncime minimă (m)" value={range.min} onChange={(e) => setRange({ ...range, min: +e.target.value })} />
+              <input className="input mono" style={{ width: 54, minHeight: 22, padding: "0 4px" }} type="number" step="0.1" aria-label={tr("adâncime minimă (m)")} value={range.min} onChange={(e) => setRange({ ...range, min: +e.target.value })} />
               –
-              <input className="input mono" style={{ width: 54, minHeight: 22, padding: "0 4px" }} type="number" step="0.1" aria-label="adâncime maximă (m)" value={range.max} onChange={(e) => setRange({ ...range, max: +e.target.value })} /> m
+              <input className="input mono" style={{ width: 54, minHeight: 22, padding: "0 4px" }} type="number" step="0.1" aria-label={tr("adâncime maximă (m)")} value={range.max} onChange={(e) => setRange({ ...range, max: +e.target.value })} /> m
             </>
           )}
         </div>
