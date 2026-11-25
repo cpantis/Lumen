@@ -186,6 +186,9 @@ export function RequirementsView() {
         <h2>{tr("Cerințe & teste")}</h2>
         <span className="sub">{tr("2.4 · aceleași praguri ca scripturile de test (config/thresholds.yaml) — o singură sursă de adevăr")}</span>
       </div>
+      <div className="callout warn" role="note" data-testid="exploratory-note">
+        The thresholds on this page are <b>exploratory proposals</b> (derived from this recording or from config/thresholds.yaml), not the project's requirements. To compare with the requirements of the Python test suite, import its YAML in Causality &amp; latency → Python test-suite metrics; StampTrace issues no PASS/FAIL of record.
+      </div>
       <div className="grid-2" style={{ marginBottom: 16 }}>
         {(["derived", "strict"] as const).map((p) => {
           const c = p === "derived" ? cd : cs;

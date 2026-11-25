@@ -6,6 +6,7 @@
  * tolerance, so "the app and the tests measure the same thing" is itself verified.
  */
 import { NS_PER_MS } from "./time";
+import { computeParity } from "./parity";
 import type { Analysis } from "./types";
 
 export interface MetricsFile {
@@ -33,11 +34,17 @@ export interface MetricsFile {
     string,
     { kind: string; match_rate: number; latency_p50_ms: number; latency_p95_ms: number; latency_max_ms: number; drop_ratio: number }
   >;
+  /** Python-suite definitions (src/core/parity.ts), per output, with the inferred trigger */
+  outputs?: Record<
+    string,
+    { trigger: string | null; e2e_p50_ms: number; e2e_p95_ms: number; e2e_max_ms: number; proc_p50_ms: number; proc_p95_ms: number; rate_hz: number; max_interval_ms: number; longest_stall_s: number | null }
+  >;
+  longest_stall_s?: number | null;
 }
 
 const r6 = (v: number) => (Number.isFinite(v) ? +v.toFixed(6) : null) as number;
 
-export function buildMetrics(a: Analysis, tool: string): MetricsFile {
+export function buildMetrics(a: Analysis, tool: string, triggerOverrides: Record<string, string> = {}): MetricsFile {
   const topics: MetricsFile["topics"] = {};
   for (const t of a.topics) {
     let empty = 0, invalid = 0, nan = 0, dup = 0;
@@ -73,7 +80,22 @@ export function buildMetrics(a: Analysis, tool: string): MetricsFile {
       drop_ratio: r6(e.dropRatio),
     };
   }
-  return { tool, file: a.fileName, sha256: a.sha256, duration_s: r6(a.durationNs / 1e9), topics, edges };
+  const par = computeParity(a.topics, (t) => t.autoRole === "output", (t) => t.autoRole === "input", a.durationNs, triggerOverrides);
+  const outputs: NonNullable<MetricsFile["outputs"]> = {};
+  for (const o of par.outputs) {
+    outputs[o.output] = {
+      trigger: o.trigger ?? null,
+      e2e_p50_ms: r6(o.e2e.p50 / NS_PER_MS),
+      e2e_p95_ms: r6(o.e2e.p95 / NS_PER_MS),
+      e2e_max_ms: r6(o.e2e.max / NS_PER_MS),
+      proc_p50_ms: r6(o.processing.p50 / NS_PER_MS),
+      proc_p95_ms: r6(o.processing.p95 / NS_PER_MS),
+      rate_hz: r6(o.intervals.meanHz),
+      max_interval_ms: r6(o.intervals.maxNs / NS_PER_MS),
+      longest_stall_s: o.stall?.missedFrames ? r6(o.stall.durationNs / 1e9) : null,
+    };
+  }
+  return { tool, file: a.fileName, sha256: a.sha256, duration_s: r6(a.durationNs / 1e9), topics, edges, outputs, longest_stall_s: par.longestStall ? r6(par.longestStall.durationNs / 1e9) : null };
 }
 
 export interface CrossCheckRow {

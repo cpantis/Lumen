@@ -129,6 +129,8 @@ export interface AppState {
   stepLengthM: number;
   gapFactor: number;
   paletteOpen: boolean;
+  /** imported requirement YAML of the Python test suite */
+  pyRequirements?: { name: string; text: string };
   /** export dialog (video / snapshots) */
   exportOpen?: "video" | "snapshots";
   helpOpen: boolean;
