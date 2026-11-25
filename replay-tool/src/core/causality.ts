@@ -45,6 +45,26 @@ export function plausibleSource(e: CausalEdge, inputType: string, outputType: st
   return true;
 }
 
+/**
+ * Independence evidence: a topic computed from another can never exist in a frame slot
+ * where its source is missing. When ≥ 2 messages (and ≥ 1 %) of O carry a stamp that the
+ * candidate source I does not have, inside I's active span, O is not derived from I —
+ * e.g. a hardware-synchronised depth camera logged a few ms after the rgb camera.
+ */
+export function producedWithoutSource(e: CausalEdge, topics: TopicData[]): boolean {
+  const i = topics.find((t) => t.topic === e.input);
+  const o = topics.find((t) => t.topic === e.output);
+  if (!i || !o || !i.count) return false;
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < i.count; k++) {
+    if (i.stamp[k] < lo) lo = i.stamp[k];
+    if (i.stamp[k] > hi) hi = i.stamp[k];
+  }
+  let n = 0;
+  for (let j = 0; j < o.count; j++) if (e.inputIndex[j] < 0 && o.stamp[j] >= lo && o.stamp[j] <= hi) n++;
+  return n >= 2 && n / Math.max(1, o.count) >= 0.01;
+}
+
 /** Minimum median delay for a topic to count as *processed* from another (ns). */
 export const MIN_PROCESSING_NS = 2e6;
 
@@ -165,7 +185,7 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
   // Pick, for each output, the earliest source in the chain.
   const typeOf = (n: string) => topics.find((t) => t.topic === n)?.type ?? "";
   const processed = raw.filter(
-    (e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && typeOf(e.output) !== "sensor_msgs/CameraInfo" && plausibleSource(e, typeOf(e.input), typeOf(e.output)),
+    (e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && typeOf(e.output) !== "sensor_msgs/CameraInfo" && plausibleSource(e, typeOf(e.input), typeOf(e.output)) && !producedWithoutSource(e, topics),
   );
   const derived = new Set(processed.map((e) => e.output));
   for (const t of topics) {
@@ -197,6 +217,21 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
       // "near" any output) proves nothing, so it is never added automatically.
       const e = raw.find((r) => r.input === i.topic && r.output === o.topic);
       if (e && plausibleSource(e, i.type, o.type)) edges.push(e);
+    }
+  }
+
+  // Hardware-synchronised cameras of different FOVs share stamps, so an output "matches"
+  // every camera. When an output has a source in its own group (namespace / frame prefix),
+  // edges from other groups are dropped.
+  {
+    const key = (n: string) => {
+      const t = topics.find((x) => x.topic === n);
+      return t ? fovKey(t)?.value : undefined;
+    };
+    for (const o of outputs) {
+      const k = key(o.topic);
+      if (!k || !edges.some((e) => e.output === o.topic && key(e.input) === k)) continue;
+      for (let i = edges.length - 1; i >= 0; i--) if (edges[i].output === o.topic && key(edges[i].input) !== k) edges.splice(i, 1);
     }
   }
 

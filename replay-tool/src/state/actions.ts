@@ -39,10 +39,10 @@ let parityCache: ParityReport | undefined;
 export function parity(s: AppState = app.get()): ParityReport | undefined {
   const a = s.analysis;
   if (!a) return undefined;
-  const key = `${a.sha256}|${a.analyzedAt}|${JSON.stringify(s.roleOverrides)}|${JSON.stringify(s.triggerOverrides)}`;
+  const key = `${a.sha256}|${a.analyzedAt}|${JSON.stringify(s.roleOverrides)}|${JSON.stringify(s.fovOverrides)}|${JSON.stringify(s.triggerOverrides)}`;
   if (key !== parityKey || !parityCache) {
     parityKey = key;
-    parityCache = computeParity(a.topics, (t) => effectiveRole(t, s) === "output", (t) => effectiveRole(t, s) === "input", a.durationNs, s.triggerOverrides);
+    parityCache = computeParity(a.topics, (t) => effectiveRole(t, s) === "output", (t) => effectiveRole(t, s) === "input", a.durationNs, s.triggerOverrides, (t) => effectiveFov(t, s));
   }
   return parityCache;
 }

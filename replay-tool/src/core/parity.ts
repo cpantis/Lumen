@@ -168,7 +168,12 @@ export const MAX_PRODUCED_WITHOUT = 0.1;
  */
 export const NON_TRIGGER_TYPES = new Set(["sensor_msgs/CameraInfo", "tf2_msgs/TFMessage", "sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix", "sensor_msgs/FluidPressure", "sensor_msgs/Temperature"]);
 
-export function inferTrigger(out: TopicData, inputs: TopicData[]): TriggerInference {
+export function inferTrigger(out: TopicData, allInputs: TopicData[], fovOf: (t: TopicData) => string | undefined = (t) => t.autoFov): TriggerInference {
+  // Hardware-synchronised cameras of different FOVs can share stamps: when the output has
+  // a field of view with its own inputs, only those are candidates.
+  const fov = fovOf(out);
+  const same = fov ? allInputs.filter((i) => fovOf(i) === fov) : [];
+  const inputs = same.some((i) => i.hasHeader && !NON_TRIGGER_TYPES.has(i.type)) ? same : allInputs;
   const cands: Array<TriggerCandidate & { stamps: Set<number> }> = [];
   const outStamps = new Set<number>();
   for (let j = 0; j < out.count; j++) if (Number.isFinite(out.stamp[j])) outStamps.add(out.stamp[j]);
@@ -285,12 +290,13 @@ export function computeParity(
   isInput: (t: TopicData) => boolean,
   durationNs: number,
   triggerOverrides: Record<string, string> = {},
+  fovOf: (t: TopicData) => string | undefined = (t) => t.autoFov,
 ): ParityReport {
   const inputs = topics.filter(isInput);
   const outputs: OutputParity[] = [];
   let longest: ParityReport["longestStall"];
   for (const o of topics.filter((t) => isOutput(t) && t.count > 0)) {
-    const inference = inferTrigger(o, inputs);
+    const inference = inferTrigger(o, inputs, fovOf);
     const ov = triggerOverrides[o.topic];
     const trigName = ov ?? inference.trigger;
     const trig = topics.find((t) => t.topic === trigName);

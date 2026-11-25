@@ -140,6 +140,59 @@ Defectele injectate, pe care testele verifică faptul că aplicația le găseșt
 | \|a\| = 120 m/s² | IMU la 5 s | REQ-CONT-05 |
 | nor deplasat cu +0,8 m | `cam_front` 200–215 | consistența nor ↔ adâncime (2.3) |
 
+## Parity with the Python tool
+
+StampTrace covers what the Python replay script (`scripts/10_replay.py` + `sw_test/replay.py` in `lumen_sw_test`) does, for any ROS 2 MCAP, in the browser and without a backend (the file never leaves the computer). Nothing about one recording is hard-coded: topics, number of FOVs, rates, ranges, roles and triggers are derived from the file, shown as **inferred** with their evidence, and can be overridden (Inventory → *Inferred settings*); overrides are saved per file, in the deep link (`o=`, `base=`) and in every export.
+
+> The Python sources were not available while this was built. The mapping below follows the feature list of the parity specification; the metric definitions are the ones the specification gives for the Python suite.
+
+| Python replay script | StampTrace |
+|---|---|
+| Open one recording / consecutive parts | Start screen: pick or drop one or several `.mcap` (merged by log time, per-file + combined SHA-256). CLI: `npm run metrics -- part0.mcap part1.mcap …` |
+| Large files | Lazy reading through the MCAP chunk index; files without an index get a block index (offsets only) and are decoded on demand |
+| Works without CameraInfo / TF / IMU | Every optional topic is optional; tested on recordings without them (`tests/unit/generality.test.ts`, `tests/e2e/generality.spec.ts`) |
+| FOV groups | Namespace, or `header.frame_id` prefix for root topics; outputs without one take their trigger's FOV |
+| Input / output roles | Output = ≥ 50 % of its header.stamps match an input exactly and it is logged after it (match ratio + median delay shown); a topic present in frame slots where the candidate source is missing is independent of it |
+| Trigger of each output | Input whose missing frames suppress the output (drop propagation); several → the one logged last; same-FOV inputs first. Editable |
+| Nominal period / camera frame period | Median unique-stamp interval; frame period = median of the intervals < 1.5 × their median (no assumed rate) |
+| Depth display range and unit | 0 – p99.9 of the valid pixels over the recording, rounded up; unit from the encoding (16UC1 mm, 32FC1 m) unless overridden |
+| Layout "inputs and outputs per FOV" | Default layout: one row per FOV, inputs then outputs, one panel per topic (any number of FOVs); 3-column preset kept |
+| Image panels by encoding | rgb/bgr/mono as image; depth with turbo, 0 = black; class maps (8-bit, ≤ 32 values) with a palette, nearest-neighbour |
+| Point cloud bird's-eye view | BEV panel (x right, optical z up; body frames x up), distance rings at a step chosen from the range, rgb/rgba PCL colours or distance |
+| Panel header | Topic, role, header.stamp of the message shown, its age on the selected base, content summary (size, % valid depth, points); red when age > k × nominal period (k = 3, configurable) |
+| Time bases log / header.stamp | Transport switch; stamp base buffers by stamp (a late-logged message appears at its stamp) |
+| Timeline with gaps and cursor | Timeline strip, burnt into every export |
+| MP4 export | Export → Video: offline, deterministic (frame k = state at start + k/fps, default 30 fps of recording time), interval, speed factor, time base; H.264 (WebCodecs + mp4-muxer); WebM only when H.264/WebCodecs is missing, and the summary says so; progress + cancel |
+| Snapshots | Export → PNG snapshots: list of times, `replay_<t>s.png` (2 decimals, padded to 6), suggestions: largest output gap, largest latency |
+| Export metadata | File(s), SHA-256, time base, fps, interval, speed, version/commit, layout, overrides; `summary.json` `{video, frames, fps, base, render_s, …}`; PNGs carry it in a tEXt chunk |
+| Metrics (Python definitions) | Causality & latency → *Python test-suite metrics*; CLI `metrics.json` → `outputs` |
+| Requirement YAML | Import in the same section (CLI `--requirements`): threshold vs measured per id; "not computed here" for unknown metrics; no PASS/FAIL of record |
+| Rerun `.rrd` export | Out of scope |
+
+### Metric definitions (shared with the Python suite)
+
+Implemented once in `src/core/parity.ts`, used by the app, the CLI and the tests. Times are relative to the first log time.
+
+- end-to-end latency = `log_time(output) − header.stamp(output)` (the stamp copied from the input)
+- processing latency = `log_time(output) − log_time(trigger input with the same stamp)`
+- percentiles: linear interpolation (numpy default)
+- interval statistics on sorted unique header.stamps; mean rate = `(n − 1) / (last − first stamp)`
+- longest stall = longest interval on the trigger's frame grid with input frames present and no output, including the start and the end of the recording
+
+### Regression on the challenge recording
+
+`tests/unit/regression-lumen.test.ts` runs when the recording is available (`LUMEN_MCAP=/path/file.mcap npm test`, a directory of parts, or `fixtures/lumen/`) and is skipped otherwise. Expected (Python suite), within 0.1 ms / 0.01 Hz:
+
+| Output | Expected |
+|---|---|
+| /farfield/Semantic | e2e p50 108.7, p95 342.6, max 1897.5 ms; proc p95 249.0 ms; rate 4.66 Hz; max interval 1866.9 ms; trigger RGB |
+| /farfield/ColorizedPointCloud | e2e p95 215.6, max 341.2 ms; rate 4.20 Hz; max interval 2067.0 ms; trigger depth |
+| /nearfield/Semantic | e2e p95 164.5 ms; proc p95 115.1 ms; rate 14.20 Hz; trigger RGB |
+| /nearfield/ColorizedPointCloud | e2e p95 113.3, max 201.6 ms; rate 13.66 Hz; trigger depth |
+| longest stall | 3.77 s on the frame grid |
+
+**Measured by StampTrace: not run yet** — the recording was not available in the environment where this was built. Run the test above and record the values here; if one differs, the definition must be fixed, not the expected number.
+
 ## Accesibilitate
 
 .lumen face tehnologie asistivă, așa că aplicația țintește **WCAG 2.2 AA**:
