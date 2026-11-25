@@ -74,6 +74,7 @@ async function canvasRgb(p: Locator, iw: number, ih: number, pts: Array<[number,
 
 async function hoverPixel(page: Page, p: Locator, iw: number, ih: number, x: number, y: number) {
   const c = p.locator("canvas").first();
+  await c.scrollIntoViewIfNeeded();
   const box = (await c.boundingBox())!;
   const scale = Math.min(box.width / iw, box.height / ih);
   const ox = (box.width - iw * scale) / 2, oy = (box.height - ih * scale) / 2;

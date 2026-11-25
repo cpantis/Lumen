@@ -6,6 +6,7 @@ import defaultThresholds from "../../config/thresholds.yaml?raw";
 import { evaluate, parseThresholds, type EffectiveRoles, type RequirementResult } from "../core/requirements";
 import { firstAfter, lastAtOrBefore } from "../core/sync";
 import { computeParity, type ParityReport } from "../core/parity";
+import { messageAt, stampOrder, timeOnBase } from "../core/timebase";
 import type { Analysis, Role, TopicData } from "../core/types";
 import { worker } from "../worker/client";
 import { viewEnabled } from "./features";
@@ -90,42 +91,30 @@ export function roles(s: AppState = app.get()): EffectiveRoles {
 export function fovList(a: Analysis, s: AppState = app.get()): string[] {
   return [...new Set(a.topics.map((t) => effectiveFov(t, s)).filter((x): x is string => !!x))].sort();
 }
+/** Colour of the k-th field of view (two theme tokens, then distinct hues for more FOVs). */
+export function fovColor(k: number): string {
+  if (k === 0) return "var(--role-fov1)";
+  if (k === 1) return "var(--role-fov2)";
+  return k < 0 ? "var(--role-unknown)" : `hsl(${(30 + k * 67) % 360} 65% 62%)`;
+}
 /** Colour token for a topic (consistent everywhere: timeline, panel head, plots). */
 export function topicColor(t: TopicData, s: AppState = app.get()): string {
   const role = effectiveRole(t, s);
   if (role === "input") return "var(--role-input)";
   if (role === "unknown") return "var(--role-unknown)";
   const fovs = s.analysis ? fovList(s.analysis, s) : [];
-  const i = fovs.indexOf(effectiveFov(t, s) ?? "");
-  return i === 1 ? "var(--role-fov2)" : i === 0 ? "var(--role-fov1)" : "var(--role-unknown)";
+  return fovColor(fovs.indexOf(effectiveFov(t, s) ?? ""));
 }
 
 // ---------------------------------------------------------------- time indexing
-const stampIndex = new WeakMap<TopicData, { sorted: Float64Array; order: Int32Array }>();
-/** Sorted header stamps (for header.stamp time source) with the original indices. */
-export function stampOrder(t: TopicData) {
-  let e = stampIndex.get(t);
-  if (!e) {
-    const order = Int32Array.from({ length: t.count }, (_, i) => i).sort((a, b) => t.stamp[a] - t.stamp[b]);
-    e = { sorted: Float64Array.from(order, (i) => t.stamp[i]), order };
-    stampIndex.set(t, e);
-  }
-  return e;
-}
-
+export { stampOrder } from "../core/timebase";
 /** Index of the message shown at time `time` for a topic, under the chosen time source. */
 export function indexAt(t: TopicData, time: number, source: AppState["timeSource"] = app.get().timeSource): number {
-  if (source === "header" && t.hasHeader) {
-    const { sorted, order } = stampOrder(t);
-    const k = lastAtOrBefore(sorted, time);
-    return k < 0 ? -1 : order[k];
-  }
-  return lastAtOrBefore(t.log, time);
+  return messageAt(t, time, source);
 }
-
 /** Time of message i under the chosen time source. */
 export function timeOf(t: TopicData, i: number, source: AppState["timeSource"] = app.get().timeSource): number {
-  return source === "header" && t.hasHeader ? t.stamp[i] : t.log[i];
+  return timeOnBase(t, i, source);
 }
 
 // ---------------------------------------------------------------- evaluation memo
@@ -265,11 +254,49 @@ export function importClassification(json: string): void {
 }
 
 // ---------------------------------------------------------------- default layout
-export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+const VISUAL = /Image|PointCloud2|Imu|OccupancyGrid|LaserScan|Marker|TFMessage|Pose/;
+
+/**
+ * Preset "inputs and outputs per FOV" (parity with the Python replay script): one row per
+ * inferred field of view, its inputs first then its outputs, one panel per topic; topics
+ * without a FOV in a last row. Works for any number of FOVs and topics (rows wrap).
+ */
+export function fovRowsPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
   const panels: PanelConfig[] = [];
   const layout: Layout[] = [];
-  const visualTypes = /Image|PointCloud2|Imu|OccupancyGrid|LaserScan|Marker|TFMessage|Pose/;
-  const ins = a.topics.filter((t) => effectiveRole(t, s) === "input" && visualTypes.test(t.type) && t.count > 0);
+  const shown = (t: TopicData) => t.count > 0 && (VISUAL.test(t.type) || effectiveRole(t, s) === "output") && t.type !== "sensor_msgs/CameraInfo";
+  const order = (t: TopicData) => (effectiveRole(t, s) === "input" ? 0 : effectiveRole(t, s) === "output" ? 1 : 2);
+  const rows: TopicData[][] = fovList(a, s).map((f) => a.topics.filter((t) => effectiveFov(t, s) === f && shown(t)).sort((x, y) => order(x) - order(y) || x.topic.localeCompare(y.topic)));
+  const rest = a.topics.filter((t) => !effectiveFov(t, s) && shown(t)).sort((x, y) => order(x) - order(y) || x.topic.localeCompare(y.topic));
+  if (rest.length) rows.push(rest);
+  let y = 0;
+  for (const row of rows.filter((r) => r.length)) {
+    const perLine = Math.min(row.length, 4);
+    const w = Math.floor(12 / perLine);
+    for (let k = 0; k < row.length; k += perLine) {
+      const line = row.slice(k, k + perLine);
+      const h = line.every((t) => /Imu|TFMessage/.test(t.type)) ? 5 : 7;
+      line.forEach((t, j) => {
+        const id = uid();
+        panels.push({ id, topic: t.topic, kind: "auto" });
+        layout.push({ i: id, x: j * w, y, w, h, minW: 2, minH: 3 });
+      });
+      y += h;
+    }
+  }
+  return { panels, layout };
+}
+
+/** Default layout = the per-FOV preset. */
+export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+  return fovRowsPanels(a, s);
+}
+
+/** Preset "inputs | outputs FOV 1 | outputs FOV 2" (three columns, the original layout). */
+export function columnPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+  const panels: PanelConfig[] = [];
+  const layout: Layout[] = [];
+  const ins = a.topics.filter((t) => effectiveRole(t, s) === "input" && VISUAL.test(t.type) && t.count > 0);
   const fovs = fovList(a, s);
   const columns: TopicData[][] = [ins];
   for (const f of fovs.slice(0, 2)) columns.push(a.topics.filter((t) => effectiveRole(t, s) === "output" && effectiveFov(t, s) === f));

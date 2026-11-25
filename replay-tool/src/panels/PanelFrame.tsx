@@ -7,7 +7,8 @@ import { Info, Link2, Settings2, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { staleness } from "../core/sync";
 import type { TopicData } from "../core/types";
-import { effectiveFov, effectiveRole, topicColor } from "../state/actions";
+import { effectiveFov, effectivePeriod, effectiveRole, topicColor } from "../state/actions";
+import { contentSummary } from "../core/inventory";
 import { app, useApp, type PanelConfig } from "../state/store";
 import { fmt, StatusBadge, type StatusKind } from "../ui/primitives";
 import { useAge } from "./useMessage";
@@ -51,7 +52,7 @@ export function PanelFrame({
   if (topic && index >= 0) {
     if (topic.content.decodeError[index] || topic.content.invalid[index] || error) status = "invalid";
     else if (topic.content.empty[index]) status = "empty";
-    else status = matchedFrom ? "ok" : (staleness(age, topic.rate.medianPeriodNs) as StatusKind);
+    else status = matchedFrom ? "ok" : (staleness(age, effectivePeriod(topic, s), s.staleK) as StatusKind);
   }
   // while playing the drawn frame may trail by one or two frames: report its real status, no flicker
   if (pending && !s.playing) status = "loading";
@@ -64,7 +65,7 @@ export function PanelFrame({
     app.set((st) => ({ panels: st.panels.map((p) => (p.id === cfg.id ? { ...p, options: { ...p.options, ...patch } } : p)) }));
 
   return (
-    <div className={`panel${highlight ? " highlight" : ""}`} data-topic={cfg.topic} aria-label={`Panel ${title ?? cfg.topic}`}>
+    <div className={`panel${highlight ? " highlight" : ""}${status === "stale" ? " stale" : ""}`} data-topic={cfg.topic} aria-label={`Panel ${title ?? cfg.topic}`}>
       <div className="panel-head drag-handle">
         <span className="role-bar" style={{ background: topic ? topicColor(topic, s) : "var(--role-unknown)" }} aria-hidden />
         <div className="head-text">
@@ -74,6 +75,11 @@ export function PanelFrame({
           <div className="meta">
             {topic ? `${topic.type} · ${fmt.hz(topic.rate.meanHz)} · ${role === "input" ? "input" : role === "output" ? `output${fov ? ` ${fov}` : ""}` : "unknown"}` : ""}
           </div>
+          {topic && index >= 0 && (
+            <div className="meta mono" data-testid="panel-stamp" data-tip={`header.stamp of the message shown (s from the first log time) · content of that message. Red when its age exceeds ${s.staleK} × the nominal period (${fmt.ms(effectivePeriod(topic, s), 1)}).`}>
+              {topic.hasHeader ? `stamp ${(topic.stamp[index] / 1e9).toFixed(3)} s` : `log ${(topic.log[index] / 1e9).toFixed(3)} s`} · {contentSummary(topic, index)}
+            </div>
+          )}
         </div>
         <div className="head-status">
           <StatusBadge kind={status} />

@@ -6,7 +6,7 @@
  */
 import { analyzeRecording, iterateAll, readBlock, type OpenedRecording, type PartRef } from "../core/analyze";
 import { makeDecoder, shortType, type Decoder } from "../core/decode";
-import { imageToRgba, type RosImage } from "../core/image";
+import { classMapClasses, imageToRgba, type RosImage } from "../core/image";
 import { BlobReadable } from "../core/readable";
 import type { Analysis } from "../core/types";
 import type { DecodedMessage, RenderOptions, Request, Response } from "./protocol";
@@ -186,7 +186,7 @@ function decoderFor(topic: string) {
   return d!;
 }
 
-const renderKey = (r?: RenderOptions) => (r ? `${r.colormap ?? ""}:${r.range?.min ?? ""}:${r.range?.max ?? ""}` : "");
+const renderKey = (r?: RenderOptions) => (r ? `${r.colormap ?? ""}:${r.range?.min ?? ""}:${r.range?.max ?? ""}:${r.classMap ?? ""}` : "");
 
 async function getMessage(topic: string, index: number, render?: RenderOptions): Promise<DecodedMessage> {
   const key = `${topic}#${index}#${renderKey(render)}`;
@@ -204,7 +204,9 @@ async function getMessage(topic: string, index: number, render?: RenderOptions):
     const type = shortType(d.schemaName);
     if (type === "sensor_msgs/Image") {
       const img = out.msg as RosImage;
-      out.rgba = imageToRgba(img, render);
+      const classes = render?.classMap === false ? 0 : classMapClasses(img);
+      if (classes) out.classes = classes;
+      out.rgba = imageToRgba(img, { ...render, classMap: classes > 0 });
       out.width = img.width;
       out.height = img.height;
       bytes += out.rgba.length;

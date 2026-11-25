@@ -12,7 +12,7 @@ import { distanceM, fmtDistance } from "../core/motion";
 import { useT } from "../i18n";
 import { PanelFor } from "../panels/registry";
 import { panelKindLabel } from "../panels/registry";
-import { defaultPanels, effectiveRole, fovList, indexAt, loadLayout, saveLayout, savedLayouts } from "../state/actions";
+import { columnPanels, defaultPanels, effectiveRole, fovColor, fovList, fovRowsPanels, indexAt, loadLayout, saveLayout, savedLayouts } from "../state/actions";
 import { app, uid, useApp, useClock } from "../state/store";
 import { Timeline } from "../timeline/Timeline";
 import { Transport } from "../timeline/Transport";
@@ -240,12 +240,21 @@ export function ReplayView() {
       <div>
         <Transport />
         <LatencyStrip />
-        <div className="col-heads" role="group" aria-label={tr("Coloane: intrări, ieșiri pe FOV")}>
-          <div className="col-head"><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {T.inputs} · {nIn}</div>
-          <div className="col-head"><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {T.outputs} FOV 1 · {fovs[0] ?? "—"}</div>
-          <div className="col-head">
-            <i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> {T.outputs} FOV 2 · {fovs[1] ?? "—"}
+        <div className="col-heads fov-legend" role="group" aria-label="Fields of view and layout">
+          <div className="col-head" style={{ flexWrap: "wrap", gap: 12 }}>
+            <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {T.inputs} · {nIn}</span>
+            {fovs.map((f, k) => (
+              <span key={f} data-tip={`Outputs of field of view ${f} (inferred: Inventory → Inferred settings)`}>
+                <i className="chip-dot" style={{ background: fovColor(k) }} /> FOV {k + 1} · {f}
+              </span>
+            ))}
+            {fovs.length === 0 && <span className="muted">no field of view inferred</span>}
             <span className="spacer" />
+            <select className="input" style={{ minHeight: 28 }} aria-label="Layout preset" value="" onChange={(e) => e.target.value && app.set(e.target.value === "rows" ? fovRowsPanels(a) : columnPanels(a))}>
+              <option value="">Layout preset…</option>
+              <option value="rows">Inputs and outputs per FOV (rows)</option>
+              <option value="cols">Inputs | outputs FOV 1 | FOV 2 (columns)</option>
+            </select>
             <LayoutMenu />
             <AddPanelMenu />
           </div>

@@ -6,6 +6,8 @@ import type { Colormap, DepthRange } from "../core/image";
 export interface RenderOptions {
   colormap?: Colormap;
   range?: DepthRange;
+  /** false: never treat 8-bit single-channel images as class maps */
+  classMap?: boolean;
 }
 
 export type Request =
@@ -27,6 +29,8 @@ export interface DecodedMessage {
   bitmap?: ImageBitmap;
   width?: number;
   height?: number;
+  /** class (label) map: number of distinct class ids; drawn with a palette, nearest-neighbour */
+  classes?: number;
   error?: string;
 }
 

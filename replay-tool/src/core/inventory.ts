@@ -116,3 +116,25 @@ export function download(name: string, data: BlobPart, mime = "text/plain;charse
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/**
+ * One-line content summary of message i, as in the Python replay header: size, and
+ * % valid depth (depth images) or number of points (clouds).
+ */
+export function contentSummary(t: TopicData, i: number): string {
+  if (i < 0 || i >= t.count) return "";
+  const kb = t.size[i] >= 1024 * 1024 ? `${(t.size[i] / 1024 / 1024).toFixed(1)} MB` : t.size[i] >= 1024 ? `${(t.size[i] / 1024).toFixed(1)} kB` : `${t.size[i]} B`;
+  const c = t.content;
+  if (!c?.elements) return kb;
+  const enc = t.details["encoding"] ?? "";
+  if (t.type === "sensor_msgs/Image" && /^(16uc1|32fc1|mono16)$/i.test(enc)) {
+    const valid = 1 - c.zeroRatio[i] - c.nanRatio[i];
+    return `${kb} · ${(valid * 100).toFixed(1)}% valid depth`;
+  }
+  if (t.type === "sensor_msgs/PointCloud2") {
+    const n = c.elements[i];
+    const valid = Math.round(n * (1 - c.nanRatio[i] - c.zeroRatio[i]));
+    return `${kb} · ${n.toLocaleString("en-US")} points${valid !== n ? ` (${valid.toLocaleString("en-US")} valid)` : ""}`;
+  }
+  return kb;
+}

@@ -79,18 +79,21 @@ export function pixelValue(img: RosImage, x: number, y: number, c = 0): number {
   return NaN;
 }
 
-/** Human-readable read-out for the hover tooltip. 16UC1 depth is in mm by REP-118. */
-export function pixelReadout(img: RosImage, x: number, y: number): string {
+/**
+ * Human-readable read-out for the hover tooltip. Depth unit from the encoding (REP-118:
+ * 16UC1 = mm, 32FC1 = m) unless `unit` overrides it.
+ */
+export function pixelReadout(img: RosImage, x: number, y: number, unit?: "mm" | "m"): string {
   const info = encodingInfo(img.encoding);
   if (!info || x < 0 || y < 0 || x >= img.width || y >= img.height) return "";
   const e = img.encoding.toLowerCase();
-  if (e === "16uc1" || e === "mono16") {
+  if (e === "16uc1" || e === "mono16" || e === "32fc1") {
     const v = pixelValue(img, x, y);
-    return e === "16uc1" ? `${v} mm (${(v / 1000).toFixed(3)} m)` : `${v}`;
-  }
-  if (e === "32fc1") {
-    const v = pixelValue(img, x, y);
-    return Number.isFinite(v) ? `${v.toFixed(3)} m` : `${v}`;
+    const u = unit ?? (e === "16uc1" ? "mm" : e === "32fc1" ? "m" : undefined);
+    if (!Number.isFinite(v)) return `${v}`;
+    if (u === "mm") return `${v} mm (${(v / 1000).toFixed(3)} m)`;
+    if (u === "m") return `${v.toFixed(3)} m`;
+    return `${v}`;
   }
   const vals: number[] = [];
   for (let c = 0; c < info.channels; c++) vals.push(pixelValue(img, x, y, c));
@@ -153,17 +156,67 @@ export function autoDepthRange(img: RosImage): DepthRange {
   return { min: vals[Math.floor(vals.length * 0.02)], max: vals[Math.floor(vals.length * 0.98)] || vals[vals.length - 1] };
 }
 
+/** Max distinct values for an 8-bit single-channel image to be treated as a class (label) map. */
+export const CLASS_MAP_MAX = 32;
+
+/**
+ * Class map detection: an 8-bit single-channel image with at most CLASS_MAP_MAX distinct
+ * values is a label image (semantic segmentation), not a camera frame. Returns the
+ * number of distinct values, or 0 when it is not a class map.
+ */
+export function classMapClasses(img: RosImage): number {
+  const e = img.encoding.toLowerCase();
+  if (!(e === "mono8" || e === "8uc1") || !img.width || !img.height || img.data.length < img.step * img.height) return 0;
+  const seen = new Uint8Array(256);
+  let n = 0;
+  for (let y = 0; y < img.height; y++) {
+    const row = y * img.step;
+    for (let x = 0; x < img.width; x++) {
+      const v = img.data[row + x];
+      if (!seen[v]) {
+        seen[v] = 1;
+        if (++n > CLASS_MAP_MAX) return 0;
+      }
+    }
+  }
+  return n;
+}
+
+/** Deterministic categorical palette for class ids (id 0 dark grey). */
+export function classColour(id: number): [number, number, number] {
+  if (id === 0) return [40, 40, 40];
+  const P: Array<[number, number, number]> = [
+    [230, 25, 75], [60, 180, 75], [255, 225, 25], [0, 130, 200], [245, 130, 48], [145, 30, 180], [70, 240, 240], [240, 50, 230],
+    [210, 245, 60], [250, 190, 212], [0, 128, 128], [220, 190, 255], [170, 110, 40], [255, 250, 200], [128, 0, 0], [170, 255, 195],
+    [128, 128, 0], [255, 215, 180], [0, 0, 128], [128, 128, 128],
+  ];
+  return P[(id - 1) % P.length];
+}
+
 /**
  * Converts a ROS image to RGBA bytes. Invalid depth (0, NaN) is rendered transparent
  * black so that "no data" is never confused with "near".
  */
-export function imageToRgba(img: RosImage, opts: { colormap?: Colormap; range?: DepthRange } = {}): Uint8ClampedArray {
+export function imageToRgba(img: RosImage, opts: { colormap?: Colormap; range?: DepthRange; classMap?: boolean } = {}): Uint8ClampedArray {
   const { width: w, height: h } = img;
   const out = new Uint8ClampedArray(w * h * 4);
   const e = img.encoding.toLowerCase();
   const info = encodingInfo(e);
   if (!info || w === 0 || h === 0 || img.data.length < img.step * h) return out;
   const d = img.data;
+  if (opts.classMap) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const [r, g, b] = classColour(d[y * img.step + x]);
+        const o = (y * w + x) * 4;
+        out[o] = r;
+        out[o + 1] = g;
+        out[o + 2] = b;
+        out[o + 3] = 255;
+      }
+    }
+    return out;
+  }
   if (isDepthLike(e)) {
     const range = opts.range ?? autoDepthRange(img);
     const span = range.max - range.min || 1;

@@ -6,7 +6,7 @@ import { Camera, Contrast, Film, HelpCircle, Moon, PanelRight, Search, Settings,
 import { useEffect, useMemo, useState } from "react";
 import { parseTimeInput } from "../core/time";
 import { setLang, useT, type Lang } from "../i18n";
-import { closeFile, defaultPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
+import { closeFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, type ViewName } from "../state/store";
 import { downloadSnapshot, exportVideo } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
@@ -161,6 +161,8 @@ export function CommandPalette() {
       { group: "action", label: "Strict profile", run: () => app.set({ profile: "strict" }) },
       { group: "action", label: T.tour, run: () => app.set({ tourStep: 0 }) },
       { group: "layout", label: T.layoutReset, run: () => app.set(defaultPanels(app.get().analysis!)) },
+      { group: "layout", label: "Layout: inputs and outputs per FOV (one row per FOV)", run: () => app.set(fovRowsPanels(app.get().analysis!)) },
+      { group: "layout", label: "Layout: inputs | outputs FOV 1 | outputs FOV 2 (columns)", run: () => app.set(columnPanels(app.get().analysis!)) },
     );
     if (a) {
       for (const t of a.topics) list.push({ group: "topic", label: `${t.topic} · ${t.type}`, run: () => { app.set({ view: "inventory" }); } });
