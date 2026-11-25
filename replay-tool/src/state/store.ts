@@ -93,6 +93,16 @@ export interface AppState {
   view: ViewName;
   roleOverrides: Record<string, Role>;
   fovOverrides: Record<string, string>;
+  /** output topic → trigger input chosen by the user */
+  triggerOverrides: Record<string, string>;
+  /** topic → nominal period (ns) chosen by the user */
+  periodOverrides: Record<string, number>;
+  /** depth topic → display unit / range chosen by the user */
+  depthOverrides: Record<string, { unit?: "mm" | "m"; maxM?: number }>;
+  /** point-cloud topic → colouring field ("distance" or a field name) */
+  cloudColourOverrides: Record<string, string>;
+  /** a panel is red when its message is older than k × the topic's nominal period */
+  staleK: number;
   panels: PanelConfig[];
   layout: Layout[];
   playing: boolean;
@@ -133,6 +143,11 @@ export const app = new Store<AppState>({
   view: "replay",
   roleOverrides: {},
   fovOverrides: {},
+  triggerOverrides: {},
+  periodOverrides: {},
+  depthOverrides: {},
+  cloudColourOverrides: {},
+  staleK: 3,
   panels: [],
   layout: [],
   playing: false,

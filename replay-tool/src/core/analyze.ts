@@ -10,6 +10,8 @@
  */
 import { McapIndexedReader, McapRecordBuilder, McapStreamReader, type McapTypes } from "@mcap/core";
 import { inferCausality } from "./causality";
+import { DEPTH_BINS, inferTopic } from "./infer";
+import { isDepthLike } from "./image";
 import { contentMetrics, DEFAULT_RANGES, type PlausibleRanges } from "./content";
 import { decompressHandlers, makeDecoder, rootDefinition, shortType, type ChannelInfo, type Decoder, type SchemaInfo } from "./decode";
 import { estimateMotion } from "./motion";
@@ -499,6 +501,8 @@ interface Acc {
   frameIds: Set<string>;
   details?: Record<string, string>;
   firstError?: string;
+  /** valid depth values of the whole recording (depth images only) */
+  depthHist?: Uint32Array;
 }
 
 /**
@@ -600,7 +604,8 @@ async function analyzeOpened(
     if (msg?.header?.frame_id !== undefined) a.frameIds.add(msg.header.frame_id);
     const type = shortType(a.schema?.name ?? "");
     if (!a.details) a.details = formatDetails(type, msg);
-    a.samples.push(contentMetrics(a.schema?.name ?? "", msg, ranges));
+    if (!a.depthHist && type === "sensor_msgs/Image" && isDepthLike(String(msg?.encoding ?? ""))) a.depthHist = new Uint32Array(DEPTH_BINS);
+    a.samples.push(contentMetrics(a.schema?.name ?? "", msg, ranges, a.depthHist));
     if (++k % 500 === 0) progress("analysing messages", Math.min(1, Number(m.logTime - start) / span));
   }
   } catch (err) {
@@ -714,6 +719,8 @@ async function analyzeOpened(
       roleReason: "",
       firstError: a.firstError,
     });
+    const td = topics[topics.length - 1];
+    td.inference = inferTopic(td, a.depthHist);
   }
   topics.sort((x, y) => x.topic.localeCompare(y.topic));
   progress("causality", 0.5);

@@ -162,13 +162,19 @@ export const MAX_PRODUCED_WITHOUT = 0.1;
  * a frame slot suppresses the output (drop propagation). When several qualify (the output
  * needs all of them), the one logged last triggers the computation.
  */
+/**
+ * Inputs that can never be a trigger: calibration / transform metadata and non-visual
+ * sensors share a frame's stamps without being the data a component processes.
+ */
+export const NON_TRIGGER_TYPES = new Set(["sensor_msgs/CameraInfo", "tf2_msgs/TFMessage", "sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix", "sensor_msgs/FluidPressure", "sensor_msgs/Temperature"]);
+
 export function inferTrigger(out: TopicData, inputs: TopicData[]): TriggerInference {
   const cands: Array<TriggerCandidate & { stamps: Set<number> }> = [];
   const outStamps = new Set<number>();
   for (let j = 0; j < out.count; j++) if (Number.isFinite(out.stamp[j])) outStamps.add(out.stamp[j]);
   if (!out.hasHeader || !outStamps.size) return { output: out.topic, candidates: [], reason: "the output has no header.stamp" };
   for (const inp of inputs) {
-    if (!inp.hasHeader || inp.topic === out.topic || !inp.count) continue;
+    if (!inp.hasHeader || inp.topic === out.topic || !inp.count || NON_TRIGGER_TYPES.has(inp.type)) continue;
     const by = firstByStamp(inp);
     let matched = 0;
     const delay: number[] = [];

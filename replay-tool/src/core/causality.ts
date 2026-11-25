@@ -8,6 +8,7 @@
  * published after I, we have proof that O is derived from I.
  */
 import { summarize } from "./stats";
+import { fovKey } from "./infer";
 import { lastAtOrBefore } from "./sync";
 import type { CausalEdge, FovGroup, Role, TopicData } from "./types";
 
@@ -199,28 +200,50 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
     }
   }
 
-  // 4) FOV = primary image input (highest exact match) of each output
-  const fovOf = (topic: string) => topic.split("/").filter(Boolean)[0] ?? topic;
-  const groups = new Map<string, { primary: string; outputs: string[] }>();
-  for (const o of outputs) {
-    const best = edges
+  // 4) FOV: topics are grouped by namespace or header.frame_id prefix (fovKey). A key is a
+  // field of view when it contains at least one image or point-cloud input; an output
+  // without a key of its own (root topic, no frame) takes the FOV of its primary image input.
+  const keyOf = new Map(topics.map((t) => [t.topic, fovKey(t)] as const));
+  const fovKeys = new Set<string>();
+  for (const t of inputs) {
+    const k = keyOf.get(t.topic);
+    if (k && (IMAGE_TYPES.has(t.type) || t.type === "sensor_msgs/PointCloud2")) fovKeys.add(k.value);
+  }
+  const primaryOf = (o: TopicData) =>
+    edges
       .filter((e) => e.output === o.topic && e.kind === "exact" && IMAGE_TYPES.has(topics.find((t) => t.topic === e.input)!.type))
       .sort((a, b) => b.matchRate - a.matchRate || nsAffinity(b.input, o.topic) - nsAffinity(a.input, o.topic))[0];
-    if (!best) continue;
-    const fov = fovOf(best.input);
-    o.autoFov = fov;
-    const g = groups.get(fov) ?? { primary: best.input, outputs: [] };
-    g.outputs.push(o.topic);
-    groups.set(fov, g);
-  }
-  for (const t of inputs) {
-    const fov = [...groups.entries()].find(([, g]) => g.primary === t.topic)?.[0];
-    if (fov) t.autoFov = fov;
-    else {
-      // inputs sharing a namespace with a FOV (camera_info of the same camera…)
-      const ns = fovOf(t.topic);
-      if (groups.has(ns)) t.autoFov = ns;
+  for (const t of topics) {
+    const k = keyOf.get(t.topic);
+    if (k && fovKeys.has(k.value)) {
+      t.autoFov = k.value;
+      t.fovReason = k.evidence;
     }
+  }
+  for (const o of outputs) {
+    if (o.autoFov) continue;
+    const best = primaryOf(o);
+    const fov = best && topics.find((t) => t.topic === best.input)?.autoFov;
+    if (fov) {
+      o.autoFov = fov;
+      o.fovReason = `copies the stamps of ${best.input} (FOV ${fov})`;
+    }
+  }
+  const groups = new Map<string, { primary: string; outputs: string[] }>();
+  for (const o of outputs) {
+    if (!o.autoFov) continue;
+    const g = groups.get(o.autoFov) ?? { primary: "", outputs: [] };
+    g.outputs.push(o.topic);
+    if (!g.primary) {
+      const best = primaryOf(o);
+      const inFov = best && topics.find((t) => t.topic === best.input)?.autoFov === o.autoFov;
+      if (inFov) g.primary = best.input;
+    }
+    groups.set(o.autoFov, g);
+  }
+  for (const [fov, g] of groups) {
+    if (!g.primary) g.primary = inputs.find((t) => t.autoFov === fov && IMAGE_TYPES.has(t.type))?.topic ?? "";
+    if (!g.primary) groups.delete(fov);
   }
 
   const fovGroups: FovGroup[] = [];

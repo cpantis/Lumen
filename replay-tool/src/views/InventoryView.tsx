@@ -17,6 +17,7 @@ import { worker } from "../worker/client";
 import { drawImageFit } from "../panels/ImagePanel";
 import { parsePointCloud, type RosPointCloud2 } from "../core/pointcloud";
 import { tr } from "../i18n";
+import { InferencePanel } from "./InferencePanel";
 
 function Thumbnail({ t }: { t: TopicData }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -206,6 +207,7 @@ export function InventoryView() {
           {tr("Euristica: tipurile brute de senzor (Image, CompressedImage, Imu, CameraInfo) sunt intrări; un topic devine")} <b>{tr("ieșire")}</b> {tr("când ≥ 50 % din header.stamp-uri sunt copiate exact din alt topic și e publicat la > 2 ms după el (dovadă de procesare). Rolurile și FOV-urile se pot edita; se salvează local pentru acest fișier (după SHA-256).")}
         </p>
       </Section>
+      <InferencePanel />
       {selected && (
         <Section title={`${tr("Detalii:")} ${selected.topic}`} sub={tr("Regularitatea pe toată înregistrarea, formatul și ceasurile")}>
           <TopicDetail t={selected} />

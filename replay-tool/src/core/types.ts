@@ -4,6 +4,7 @@
  * by every view. Per-message data is stored in typed arrays (structured-clone friendly).
  */
 import type { Gap, RateStats, Summary } from "./stats";
+import type { TopicInference } from "./infer";
 
 export type Role = "input" | "output" | "unknown";
 
@@ -55,8 +56,12 @@ export interface TopicData {
   /** automatic classification + human-readable evidence */
   autoRole: Role;
   roleReason: string;
-  /** field of view (group) this topic belongs to, inferred from causality */
+  /** field of view (group) this topic belongs to: namespace / frame_id prefix / trigger's FOV */
   autoFov?: string;
+  /** evidence for autoFov */
+  fovReason?: string;
+  /** inferred settings with evidence (periods, depth unit/range, cloud colouring) */
+  inference?: TopicInference;
   firstError?: string;
 }
 

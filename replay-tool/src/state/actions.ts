@@ -5,6 +5,7 @@
 import defaultThresholds from "../../config/thresholds.yaml?raw";
 import { evaluate, parseThresholds, type EffectiveRoles, type RequirementResult } from "../core/requirements";
 import { firstAfter, lastAtOrBefore } from "../core/sync";
+import { computeParity, type ParityReport } from "../core/parity";
 import type { Analysis, Role, TopicData } from "../core/types";
 import { worker } from "../worker/client";
 import { viewEnabled } from "./features";
@@ -18,6 +19,71 @@ export function effectiveRole(t: TopicData, s: AppState = app.get()): Role {
 export function effectiveFov(t: TopicData, s: AppState = app.get()): string | undefined {
   return s.fovOverrides[t.topic] ?? t.autoFov;
 }
+// ---------------------------------------------------------------- inferred settings + overrides
+/** Nominal period (ns) used for staleness: user override, else the inferred median stamp interval. */
+export function effectivePeriod(t: TopicData, s: AppState = app.get()): number {
+  return s.periodOverrides[t.topic] ?? t.inference?.framePeriodNs?.value ?? t.inference?.nominalPeriodNs.value ?? t.rate.medianPeriodNs;
+}
+export function effectiveDepth(t: TopicData, s: AppState = app.get()): { unit?: "mm" | "m"; maxM?: number } {
+  const o = s.depthOverrides[t.topic] ?? {};
+  return { unit: o.unit ?? t.inference?.depthUnit?.value, maxM: o.maxM ?? t.inference?.depthMaxM?.value };
+}
+export function effectiveCloudColour(t: TopicData, s: AppState = app.get()): string {
+  return s.cloudColourOverrides[t.topic] ?? t.inference?.cloudColour?.value ?? "distance";
+}
+
+let parityKey = "";
+let parityCache: ParityReport | undefined;
+/** Python-suite metrics for every output (memoised on roles and trigger overrides). */
+export function parity(s: AppState = app.get()): ParityReport | undefined {
+  const a = s.analysis;
+  if (!a) return undefined;
+  const key = `${a.sha256}|${a.analyzedAt}|${JSON.stringify(s.roleOverrides)}|${JSON.stringify(s.triggerOverrides)}`;
+  if (key !== parityKey || !parityCache) {
+    parityKey = key;
+    parityCache = computeParity(a.topics, (t) => effectiveRole(t, s) === "output", (t) => effectiveRole(t, s) === "input", a.durationNs, s.triggerOverrides);
+  }
+  return parityCache;
+}
+export function effectiveTrigger(output: string, s: AppState = app.get()): string | undefined {
+  return parity(s)?.outputs.find((o) => o.output === output)?.trigger;
+}
+
+/** Every user override, as saved in deep links and exports. */
+export interface Overrides {
+  roles?: Record<string, Role>;
+  fovs?: Record<string, string>;
+  triggers?: Record<string, string>;
+  periods_ms?: Record<string, number>;
+  depth?: Record<string, { unit?: "mm" | "m"; maxM?: number }>;
+  cloud_colour?: Record<string, string>;
+  stale_k?: number;
+}
+const nonEmpty = <T extends object>(o: T) => (Object.keys(o).length ? o : undefined);
+export function currentOverrides(s: AppState = app.get()): Overrides {
+  const o: Overrides = {
+    roles: nonEmpty(s.roleOverrides),
+    fovs: nonEmpty(s.fovOverrides),
+    triggers: nonEmpty(s.triggerOverrides),
+    periods_ms: nonEmpty(Object.fromEntries(Object.entries(s.periodOverrides).map(([k, v]) => [k, v / 1e6]))),
+    depth: nonEmpty(s.depthOverrides),
+    cloud_colour: nonEmpty(s.cloudColourOverrides),
+    stale_k: s.staleK !== 3 ? s.staleK : undefined,
+  };
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Overrides;
+}
+export function applyOverrides(o: Overrides): void {
+  app.set({
+    roleOverrides: o.roles ?? {},
+    fovOverrides: o.fovs ?? {},
+    triggerOverrides: o.triggers ?? {},
+    periodOverrides: Object.fromEntries(Object.entries(o.periods_ms ?? {}).map(([k, v]) => [k, v * 1e6])),
+    depthOverrides: o.depth ?? {},
+    cloudColourOverrides: o.cloud_colour ?? {},
+    staleK: o.stale_k ?? 3,
+  });
+}
+
 export function roles(s: AppState = app.get()): EffectiveRoles {
   return { role: (t) => effectiveRole(t, s), fov: (t) => effectiveFov(t, s) };
 }
@@ -138,6 +204,7 @@ function persistFileState() {
   safeSet(perFile(s.analysis.sha256), {
     roleOverrides: s.roleOverrides,
     fovOverrides: s.fovOverrides,
+    overrides: currentOverrides(s),
     notes: s.notes,
     bugs: s.bugs,
     calibrations: s.calibrations,
@@ -154,29 +221,46 @@ app.subscribe(() => {
   persistTimer = setTimeout(persistFileState, 400);
 });
 
-/** Export of the classification (roles + FOV) as JSON, importable on another machine. */
+/** Export of the classification and every override as JSON, importable on another machine. */
 export function classificationJson(): string {
   const s = app.get();
   const a = s.analysis!;
+  const par = parity(s);
   return JSON.stringify(
     {
       file: a.fileName,
       sha256: a.sha256,
-      topics: Object.fromEntries(a.topics.map((t) => [t.topic, { role: effectiveRole(t, s), fov: effectiveFov(t, s) ?? null, auto: { role: t.autoRole, fov: t.autoFov ?? null, reason: t.roleReason } }])),
+      files: a.files,
+      overrides: currentOverrides(s),
+      topics: Object.fromEntries(
+        a.topics.map((t) => [
+          t.topic,
+          {
+            role: effectiveRole(t, s),
+            fov: effectiveFov(t, s) ?? null,
+            trigger: par?.outputs.find((o) => o.output === t.topic)?.trigger ?? null,
+            nominal_period_ms: +(effectivePeriod(t, s) / 1e6).toFixed(6),
+            auto: { role: t.autoRole, fov: t.autoFov ?? null, reason: t.roleReason, fov_reason: t.fovReason ?? null, trigger: par?.outputs.find((o) => o.output === t.topic)?.inference.trigger ?? null },
+          },
+        ]),
+      ),
     },
     null,
     2,
   );
 }
 export function importClassification(json: string): void {
-  const obj = JSON.parse(json) as { topics: Record<string, { role: Role; fov: string | null }> };
-  const roleOverrides: Record<string, Role> = {};
-  const fovOverrides: Record<string, string> = {};
-  for (const [k, v] of Object.entries(obj.topics ?? {})) {
-    roleOverrides[k] = v.role;
-    if (v.fov) fovOverrides[k] = v.fov;
+  const obj = JSON.parse(json) as { overrides?: Overrides; topics: Record<string, { role: Role; fov: string | null }> };
+  if (obj.overrides) applyOverrides(obj.overrides);
+  else {
+    const roleOverrides: Record<string, Role> = {};
+    const fovOverrides: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj.topics ?? {})) {
+      roleOverrides[k] = v.role;
+      if (v.fov) fovOverrides[k] = v.fov;
+    }
+    app.set({ roleOverrides, fovOverrides });
   }
-  app.set({ roleOverrides, fovOverrides });
   toast("Classification imported");
 }
 
@@ -220,12 +304,19 @@ export async function openFile(input: File | File[]): Promise<void> {
   try {
     const s0 = app.get();
     const analysis = await worker.open(files, (phase, fraction) => app.set({ progress: { phase, fraction } }), s0.thresholds?.plausible_ranges);
-    const saved = safeGet<Partial<AppState>>(perFile(analysis.sha256), {});
+    const saved = safeGet<Partial<AppState> & { overrides?: Overrides }>(perFile(analysis.sha256), {});
+    const url0 = readUrl();
+    const ov: Overrides = url0.overrides ?? saved.overrides ?? { roles: saved.roleOverrides, fovs: saved.fovOverrides };
     app.set({
       analysis,
       phase: "ready",
-      roleOverrides: saved.roleOverrides ?? {},
-      fovOverrides: saved.fovOverrides ?? {},
+      roleOverrides: ov.roles ?? {},
+      fovOverrides: ov.fovs ?? {},
+      triggerOverrides: ov.triggers ?? {},
+      periodOverrides: Object.fromEntries(Object.entries(ov.periods_ms ?? {}).map(([k, v]) => [k, v * 1e6])),
+      depthOverrides: ov.depth ?? {},
+      cloudColourOverrides: ov.cloud_colour ?? {},
+      staleK: ov.stale_k ?? 3,
       // notes saved by older versions used Romanian tags
       notes: (saved.notes ?? []).map((n) => ({ ...n, tag: ({ întrebare: "question", presupunere: "assumption", anomalie: "anomaly" } as Record<string, Note["tag"]>)[n.tag] ?? n.tag })),
       bugs: saved.bugs ?? [],
@@ -244,6 +335,7 @@ export async function openFile(input: File | File[]): Promise<void> {
     else if (saved.panels?.length) app.set({ panels: saved.panels, layout: saved.layout ?? [] });
     else app.set(defaultPanels(analysis, s));
     if (url.view && viewEnabled(url.view as AppState["view"])) app.set({ view: url.view as AppState["view"] });
+    if (url.base) app.set({ timeSource: url.base });
     // start at the first output message so the panels are not empty on open
     const firstOut = Math.min(...analysis.topics.filter((t) => effectiveRole(t, app.get()) === "output" && t.count).map((t) => t.log[0]));
     const startT = url.t !== undefined && Number.isFinite(url.t) ? url.t : Number.isFinite(firstOut) ? firstOut : 0;
@@ -375,6 +467,8 @@ export function setSpeed(dir: 1 | -1): void {
 interface UrlState {
   t?: number;
   view?: string;
+  base?: AppState["timeSource"];
+  overrides?: Overrides;
   panels?: PanelConfig[];
   layout?: Layout[];
 }
@@ -383,6 +477,14 @@ export function readUrl(): UrlState {
   const out: UrlState = {};
   if (h.has("t")) out.t = Number(h.get("t")) * 1e9;
   if (h.has("view")) out.view = h.get("view")!;
+  if (h.get("base") === "header" || h.get("base") === "log") out.base = h.get("base") as AppState["timeSource"];
+  if (h.has("o")) {
+    try {
+      out.overrides = JSON.parse(decodeURIComponent(escape(atob(h.get("o")!)))) as Overrides;
+    } catch {
+      /* ignore malformed */
+    }
+  }
   if (h.has("p")) {
     try {
       const raw = JSON.parse(decodeURIComponent(escape(atob(h.get("p")!)))) as Array<[string, string, number, number, number, number, string?, string?]>;
@@ -405,6 +507,9 @@ export function writeUrl(): void {
   params.set("t", (clock.get().t / 1e9).toFixed(3));
   params.set("view", s.view);
   params.set("p", btoa(unescape(encodeURIComponent(JSON.stringify(p)))));
+  if (s.timeSource !== "log") params.set("base", s.timeSource);
+  const ov = currentOverrides(s);
+  if (Object.keys(ov).length) params.set("o", btoa(unescape(encodeURIComponent(JSON.stringify(ov)))));
   history.replaceState(null, "", `#${s.view === "styleguide" ? "/styleguide" : ""}?${params.toString()}`);
 }
 let urlTimer: ReturnType<typeof setTimeout> | undefined;
