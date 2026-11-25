@@ -53,7 +53,8 @@ export function PanelFrame({
     else if (topic.content.empty[index]) status = "empty";
     else status = matchedFrom ? "ok" : (staleness(age, topic.rate.medianPeriodNs) as StatusKind);
   }
-  if (pending) status = "loading";
+  // while playing the drawn frame may trail by one or two frames: report its real status, no flicker
+  if (pending && !s.playing) status = "loading";
   const role = topic ? effectiveRole(topic, s) : "unknown";
   const fov = topic ? effectiveFov(topic, s) : undefined;
   const outputsOfInput = topic && a ? a.edges.filter((e) => e.input === topic.topic).map((e) => e.output) : [];
