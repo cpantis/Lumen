@@ -65,7 +65,7 @@ export function PanelFrame({
     app.set((st) => ({ panels: st.panels.map((p) => (p.id === cfg.id ? { ...p, options: { ...p.options, ...patch } } : p)) }));
 
   return (
-    <div className={`panel${highlight ? " highlight" : ""}${status === "stale" ? " stale" : ""}`} data-topic={cfg.topic} aria-label={`Panel ${title ?? cfg.topic}`}>
+    <div className={`panel${highlight ? " highlight" : ""}${status === "stale" ? " stale" : ""}`} data-topic={cfg.topic} data-pending={pending ? "1" : undefined} aria-label={`Panel ${title ?? cfg.topic}`}>
       <div className="panel-head drag-handle">
         <span className="role-bar" style={{ background: topic ? topicColor(topic, s) : "var(--role-unknown)" }} aria-hidden />
         <div className="head-text">

@@ -8,7 +8,7 @@ import { parseTimeInput } from "../core/time";
 import { setLang, useT, type Lang } from "../i18n";
 import { closeFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, type ViewName } from "../state/store";
-import { downloadSnapshot, exportVideo } from "../export/snapshot";
+import { downloadSnapshot } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
 import { AUTHOR, fmt, Kv, Logo, Modal } from "./primitives";
@@ -46,7 +46,7 @@ export function TopBar() {
         <Search size={16} /> <kbd style={{ background: "transparent", color: "inherit" }}>⌘K</kbd>
       </button>
       <button className="btn icon ghost hide-narrow" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
-      <button className="btn icon ghost hide-narrow" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={() => app.set({ exportOpen: "video" })} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — MP4, deterministic; PNG snapshots at chosen times`}><Film size={18} /></button>
       <button className="btn icon ghost hide-narrow" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
       <button
         className="btn icon ghost"
@@ -150,7 +150,8 @@ export function CommandPalette() {
     list.push(
       { group: "action", label: "Play / pause", run: togglePlay },
       { group: "action", label: T.exportPng, run: downloadSnapshot },
-      { group: "action", label: T.exportVideo, run: () => exportVideo() },
+      { group: "action", label: T.exportVideo, run: () => app.set({ exportOpen: "video" }) },
+      { group: "action", label: "PNG snapshots at chosen times…", run: () => app.set({ exportOpen: "snapshots" }) },
       ...(features.issues
         ? [
             { group: "action", label: T.createBug, run: () => openBugDraft() },

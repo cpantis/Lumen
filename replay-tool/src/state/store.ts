@@ -129,6 +129,8 @@ export interface AppState {
   stepLengthM: number;
   gapFactor: number;
   paletteOpen: boolean;
+  /** export dialog (video / snapshots) */
+  exportOpen?: "video" | "snapshots";
   helpOpen: boolean;
   settingsOpen: boolean;
   bugDraft?: Partial<Bug>;

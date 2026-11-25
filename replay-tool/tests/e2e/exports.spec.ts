@@ -1,6 +1,6 @@
 /**
  * E2E for every export and for the compact (tablet / phone) mode:
- * PNG snapshot, WebM video of A–B, inventory CSV + Markdown, test report JSON,
+ * PNG snapshot, deterministic MP4 video, timed PNG snapshots, inventory CSV + Markdown, test report JSON,
  * bug ZIP, layout save dialog.
  */
 import { devices, expect, test, type Download, type Page } from "@playwright/test";
@@ -30,16 +30,66 @@ test("PNG snapshot of the layout", async ({ page }) => {
   expect(b.length).toBeGreaterThan(20_000);
 });
 
-test("WebM video of the A–B interval", async ({ page }) => {
+/** Duration of an MP4 (mvhd box) in seconds. */
+function mp4Duration(b: Buffer): number {
+  const i = b.indexOf("mvhd");
+  const version = b[i + 4];
+  return version === 1 ? Number(b.readBigUInt64BE(i + 4 + 4 + 16 + 4)) / b.readUInt32BE(i + 4 + 4 + 16) : b.readUInt32BE(i + 4 + 4 + 8 + 4) / b.readUInt32BE(i + 4 + 4 + 8);
+}
+
+test("deterministic MP4 video: frame count, fps x speed, summary.json with metadata", async ({ page }) => {
   await openDemo(page);
-  await page.keyboard.press("a");
-  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("b");
-  const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.getByRole("button", { name: /Export video/ }).click()]);
-  expect(d.suggestedFilename()).toMatch(/\.webm$/);
-  const b = await bytes(d);
-  expect(b.readUInt32BE(0)).toBe(0x1a45dfa3); // EBML (WebM) signature
-  expect(b.length).toBeGreaterThan(5_000);
+  await page.getByRole("button", { name: /Export video/ }).click();
+  const dlg = page.getByRole("dialog", { name: "Export" });
+  await dlg.getByLabel("Start (s)").fill("1");
+  await dlg.getByLabel("End (s)").fill("2");
+  await dlg.getByLabel("Frames per second").fill("10");
+  await dlg.getByLabel("Speed factor").fill("2");
+  await dlg.getByLabel("Time base").selectOption("header");
+  await expect(dlg).toContainText("11 frames · video 20.00 fps");
+  const downloads: Download[] = [];
+  page.on("download", (d) => downloads.push(d));
+  await dlg.getByRole("button", { name: "Render video" }).click();
+  await expect(dlg.getByTestId("export-result")).toContainText("Saved replay_1.00-2.00s_header_10fps_x2.mp4", { timeout: 120_000 });
+  await expect.poll(() => downloads.length).toBe(2);
+  const mp4 = downloads.find((d) => d.suggestedFilename().endsWith(".mp4"))!;
+  const sum = downloads.find((d) => d.suggestedFilename().endsWith(".summary.json"))!;
+  const b = await bytes(mp4);
+  expect(b.subarray(4, 8).toString()).toBe("ftyp");
+  expect(mp4Duration(b)).toBeCloseTo(11 / 20, 2);
+  const s = JSON.parse((await bytes(sum)).toString("utf8"));
+  expect(s).toMatchObject({ video: "replay_1.00-2.00s_header_10fps_x2.mp4", frames: 11, fps: 10, base: "header", video_fps: 20, speed: 2, interval_s: [1, 2], container: "mp4", time_base: "header" });
+  expect(s.codec).toMatch(/^avc1\./);
+  expect(s.render_s).toBeGreaterThan(0);
+  expect(s.sha256).toMatch(/^[0-9a-f]{64}$/);
+  expect(s.files[0]).toMatchObject({ name: "demo-synthetic.mcap" });
+  expect(s.layout.panels.length).toBeGreaterThan(3);
+  expect(s.overrides).toBeDefined();
+  expect(s.commit).toBeTruthy();
+});
+
+test("PNG snapshots at chosen times: names, ZIP, metadata in each PNG, suggestions", async ({ page }) => {
+  await openDemo(page);
+  await page.keyboard.press("Control+k");
+  await page.locator(".palette input").fill("PNG snapshots");
+  await expect(page.locator(".palette li").first()).toContainText("PNG snapshots");
+  await page.keyboard.press("Enter");
+  const dlg = page.getByRole("dialog", { name: "Export" });
+  await expect(dlg.getByRole("button", { name: /largest output gap/ })).toBeVisible();
+  await expect(dlg.getByRole("button", { name: /largest end-to-end latency/ })).toBeVisible();
+  await dlg.getByLabel("Snapshot times (s)").fill("4.2, 12.5");
+  await expect(dlg).toContainText("replay_004.20s.png  replay_012.50s.png");
+  const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), dlg.getByRole("button", { name: "Save snapshots" }).click()]);
+  expect(d.suggestedFilename()).toBe("replay_snapshots.zip");
+  const zip = await JSZip.loadAsync(await bytes(d));
+  expect(Object.keys(zip.files).sort()).toEqual(["replay_004.20s.png", "replay_012.50s.png", "summary.json"]);
+  const png = await zip.file("replay_012.50s.png")!.async("uint8array");
+  const txt = Buffer.from(png).toString("latin1");
+  expect(txt).toContain("StampTrace");
+  expect(txt).toMatch(/"t_s":12\.5/);
+  const sum = JSON.parse(await zip.file("summary.json")!.async("string"));
+  expect(sum.snapshots.map((x: { file: string }) => x.file)).toEqual(["replay_004.20s.png", "replay_012.50s.png"]);
+  expect(sum.sha256).toMatch(/^[0-9a-f]{64}$/);
 });
 
 test("inventory CSV and Markdown", async ({ page }) => {
@@ -157,4 +207,54 @@ test("first delivery: Requirements, Safety and Bugs & notes are hidden", async (
   await page.reload();
   await page.getByTestId("demo").click();
   await expect(page.locator(".replay")).toBeVisible({ timeout: 60_000 });
+});
+
+test("snapshots do not depend on machine speed: identical pixels with a 150 ms decode delay", async ({ browser }) => {
+  async function snap(slow: boolean): Promise<Buffer> {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, acceptDownloads: true });
+    const page = await ctx.newPage();
+    if (slow)
+      await page.addInitScript(() => {
+        const W = window.Worker;
+        window.Worker = class extends W {
+          override set onmessage(h: ((ev: MessageEvent) => void) | null) {
+            super.onmessage = h && ((ev: MessageEvent) => (ev.data?.op === "message" ? setTimeout(() => h.call(this, ev), 150) : h.call(this, ev)));
+          }
+          override get onmessage() {
+            return super.onmessage;
+          }
+        } as typeof Worker;
+      });
+    await openDemo(page);
+    await page.keyboard.press("Control+k");
+    await page.locator(".palette input").fill("PNG snapshots");
+    await expect(page.locator(".palette li").first()).toContainText("PNG snapshots");
+    await page.keyboard.press("Enter");
+    const dlg = page.getByRole("dialog", { name: "Export" });
+    await dlg.getByLabel("Snapshot times (s)").fill("13.9");
+    const [d] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), dlg.getByRole("button", { name: "Save snapshots" }).click()]);
+    expect(d.suggestedFilename()).toBe("replay_013.90s.png");
+    const b = await bytes(d);
+    await ctx.close();
+    return b;
+  }
+  const fast = await snap(false);
+  const slow = await snap(true);
+  const page = await browser.newPage();
+  await page.goto("/");
+  const diff = await page.evaluate(async ([a, b]) => {
+    const load = async (s: string) => createImageBitmap(await (await fetch(`data:image/png;base64,${s}`)).blob());
+    const [x, y] = await Promise.all([load(a), load(b)]);
+    if (x.width !== y.width || x.height !== y.height) return { size: `${x.width}x${x.height} vs ${y.width}x${y.height}`, px: -1 };
+    const c = new OffscreenCanvas(x.width, x.height).getContext("2d")!;
+    c.drawImage(x, 0, 0);
+    const A = c.getImageData(0, 0, x.width, x.height - 28).data; // the last 28 px hold the trace line (generated_at)
+    c.drawImage(y, 0, 0);
+    const B = c.getImageData(0, 0, x.width, x.height - 28).data;
+    let px = 0;
+    for (let i = 0; i < A.length; i += 4) if (A[i] !== B[i] || A[i + 1] !== B[i + 1] || A[i + 2] !== B[i + 2]) px++;
+    return { size: "", px };
+  }, [fast.toString("base64"), slow.toString("base64")]);
+  expect(diff.size).toBe("");
+  expect(diff.px).toBe(0);
 });

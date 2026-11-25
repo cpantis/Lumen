@@ -20,6 +20,7 @@ const RequirementsView = lazy(() => named(import("./views/RequirementsView"), "R
 const SafetyView = lazy(() => named(import("./views/SafetyView"), "SafetyView"));
 const IssuesView = lazy(() => named(import("./views/IssuesView"), "IssuesView"));
 const StyleguideView = lazy(() => named(import("./views/StyleguideView"), "StyleguideView"));
+const ExportDialog = lazy(() => named(import("./views/ExportDialog"), "ExportDialog"));
 
 function ViewFallback() {
   return (
@@ -104,10 +105,21 @@ export function App() {
       <HelpModal />
       <SettingsModal />
       <BugEditor />
+      <ExportGate />
       <Tour />
       <Toast />
       <LiveRegion />
       <TooltipLayer />
     </Fragment>
   );
+}
+
+/** The export dialog (and its encoders) load only when opened. */
+function ExportGate() {
+  const open = useApp((s) => !!s.exportOpen && s.phase === "ready");
+  return open ? (
+    <Suspense fallback={null}>
+      <ExportDialog />
+    </Suspense>
+  ) : null;
 }
