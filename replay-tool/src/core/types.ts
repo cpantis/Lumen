@@ -113,7 +113,10 @@ export interface MotionEstimate {
 export interface Analysis {
   fileName: string;
   fileSize: number;
+  /** SHA-256 of the file, or of the parts concatenated in order (multi-part recording) */
   sha256: string;
+  /** every file of the recording (one, or several consecutive parts merged by log time) */
+  files?: Array<{ name: string; size: number; sha256: string }>;
   /** absolute start/end (ns) as decimal strings to stay JSON-friendly */
   startNs: string;
   endNs: string;

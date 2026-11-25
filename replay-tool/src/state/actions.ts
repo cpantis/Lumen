@@ -206,13 +206,20 @@ export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: P
 }
 
 // ---------------------------------------------------------------- opening files
-export async function openFile(file: File): Promise<void> {
+/**
+ * Opens one MCAP file, or several consecutive parts of one recording (merged by log time;
+ * parts are ordered by their first log time, whatever the order they were picked in).
+ */
+export async function openFile(input: File | File[]): Promise<void> {
+  const files = (Array.isArray(input) ? input : [input]).slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const file = files.length === 1 ? files[0] : new File([], files.map((f) => f.name).join(" + "));
+  Object.defineProperty(file, "size", { value: files.reduce((n, f) => n + f.size, 0) });
   worker.reset();
-  app.set({ phase: "loading", file, progress: { phase: "opening", fraction: 0 }, error: undefined, playing: false });
-  pushRecent(file);
+  app.set({ phase: "loading", file, files, progress: { phase: "opening", fraction: 0 }, error: undefined, playing: false });
+  for (const f of files) pushRecent(f);
   try {
     const s0 = app.get();
-    const analysis = await worker.open(file, (phase, fraction) => app.set({ progress: { phase, fraction } }), s0.thresholds?.plausible_ranges);
+    const analysis = await worker.open(files, (phase, fraction) => app.set({ progress: { phase, fraction } }), s0.thresholds?.plausible_ranges);
     const saved = safeGet<Partial<AppState>>(perFile(analysis.sha256), {});
     app.set({
       analysis,

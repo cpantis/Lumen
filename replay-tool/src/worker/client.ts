@@ -46,8 +46,9 @@ class WorkerClient {
     this.#pending.clear();
   }
 
-  async open(file: File, onProgress: (phase: string, f: number) => void, ranges?: PlausibleRanges): Promise<Analysis> {
-    const r = await this.#call({ op: "open", file, ranges } as Omit<Request, "id">, onProgress);
+  async open(files: File | File[], onProgress: (phase: string, f: number) => void, ranges?: PlausibleRanges): Promise<Analysis> {
+    const list = Array.isArray(files) ? files : [files];
+    const r = await this.#call({ op: "open", files: list, ranges } as Omit<Request, "id">, onProgress);
     if (r.op !== "opened") throw new Error("unexpected response");
     return r.analysis;
   }

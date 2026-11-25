@@ -9,7 +9,7 @@ export interface RenderOptions {
 }
 
 export type Request =
-  | { id: number; op: "open"; file: File; ranges?: PlausibleRanges }
+  | { id: number; op: "open"; file?: File; files?: File[]; ranges?: PlausibleRanges }
   | { id: number; op: "get"; topic: string; index: number; render?: RenderOptions; prefetch?: number }
   | { id: number; op: "series"; topic: string; path: string; maxPoints?: number }
   | { id: number; op: "schemas" };

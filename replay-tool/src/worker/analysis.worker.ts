@@ -4,7 +4,7 @@
  * individual decoded messages on demand (LRU cache + prefetch of the next frames),
  * and numeric field series for the generic plot panel. The UI thread never decodes.
  */
-import { analyzeRecording, type OpenedRecording } from "../core/analyze";
+import { analyzeRecording, iterateAll, readBlock, type OpenedRecording, type PartRef } from "../core/analyze";
 import { makeDecoder, shortType, type Decoder } from "../core/decode";
 import { imageToRgba, type RosImage } from "../core/image";
 import { BlobReadable } from "../core/readable";
@@ -69,8 +69,13 @@ const inflightRanges = new Map<string, Promise<void>>();
 let rawBytes = 0;
 const RAW_BUDGET = 300 << 20;
 
-async function loadRangeAround(abs: bigint): Promise<void> {
-  const reader = opened!.reader!;
+/** The parts of the opened recording (a single file is one part with identity channel ids). */
+function partsOf(rec: OpenedRecording): PartRef[] {
+  return rec.parts ?? [{ name: "", rec, chan: new Map([...rec.channels.keys()].map((id) => [id, id])) }];
+}
+
+async function loadRangeAround(part: PartRef, abs: bigint): Promise<void> {
+  const reader = part.rec.reader!;
   const cis = reader.chunkIndexes.filter((c) => c.messageStartTime <= abs && abs <= c.messageEndTime);
   if (!cis.length) return;
   let lo = cis[0].messageStartTime, hi = cis[0].messageEndTime;
@@ -78,14 +83,16 @@ async function loadRangeAround(abs: bigint): Promise<void> {
     if (c.messageStartTime < lo) lo = c.messageStartTime;
     if (c.messageEndTime > hi) hi = c.messageEndTime;
   }
-  const rk = `${lo}-${hi}`;
+  const rk = `${part.name}|${lo}-${hi}`;
   const pending = inflightRanges.get(rk);
   if (pending) return pending;
   const job = (async () => {
     const fresh = new Map<string, Uint8Array[]>();
     let bytes = 0;
     for await (const m of reader.readMessages({ startTime: lo, endTime: hi })) {
-      const key = `${m.channelId}:${m.logTime}`;
+      const id = part.chan.get(m.channelId);
+      if (id === undefined) continue;
+      const key = `${id}:${m.logTime}`;
       const arr = fresh.get(key);
       if (arr) arr.push(m.data);
       else fresh.set(key, [m.data]);
@@ -108,8 +115,6 @@ async function loadRangeAround(abs: bigint): Promise<void> {
   }
 }
 
-/** Sequential (un-indexed) recordings: one-time index of the in-memory messages. */
-let seqIndex: Map<string, Uint8Array[]> | undefined;
 
 /** Reads the raw bytes of message #index of a topic. */
 async function readRaw(topic: string, index: number): Promise<Uint8Array | undefined> {
@@ -121,24 +126,53 @@ async function readRaw(topic: string, index: number): Promise<Uint8Array | undef
   let occurrence = 0;
   for (let j = index - 1; j >= 0 && t.log[j] === rel; j--) occurrence++;
   const key = `${t.channelId}:${abs}`;
-  if (opened.indexed && opened.reader) {
-    let hit = rawByKey.get(key);
-    if (!hit || hit.length <= occurrence) {
-      await loadRangeAround(abs);
-      hit = rawByKey.get(key);
-    }
-    return hit?.[occurrence];
+  let hit = rawByKey.get(key);
+  if (hit && hit.length > occurrence) return hit[occurrence];
+  const parts = partsOf(opened).filter((p) => [...p.chan.values()].includes(t.channelId));
+  for (const p of parts) {
+    if (p.rec.indexed && p.rec.reader) await loadRangeAround(p, abs);
+    else if (p.rec.lazy) await loadLazyAround(p, abs);
   }
-  if (!seqIndex) {
-    seqIndex = new Map();
-    for (const m of opened.messages ?? []) {
-      const k = `${m.channelId}:${m.logTime}`;
-      const arr = seqIndex.get(k);
-      if (arr) arr.push(m.data);
-      else seqIndex.set(k, [m.data]);
+  return rawByKey.get(key)?.[occurrence];
+}
+
+/** Un-indexed / salvaged parts: decode the blocks whose time span contains `abs`. */
+async function loadLazyAround(part: PartRef, abs: bigint): Promise<void> {
+  const blocks = part.rec.lazy!.blocks.filter((b) => b.start <= abs && abs <= b.end);
+  if (!blocks.length) return;
+  const rk = `${part.name}|lazy|${blocks.map((b) => b.offset).join(",")}`;
+  const pending = inflightRanges.get(rk);
+  if (pending) return pending;
+  const job = (async () => {
+    const fresh = new Map<string, Uint8Array[]>();
+    let bytes = 0;
+    for (const b of blocks) {
+      for (const m of await readBlock(part.rec, b)) {
+        const id = part.chan.get(m.channelId);
+        if (id === undefined) continue;
+        const key = `${id}:${m.logTime}`;
+        const arr = fresh.get(key);
+        if (arr) arr.push(m.data);
+        else fresh.set(key, [m.data]);
+        bytes += m.data.length;
+      }
     }
+    // a key can span two blocks (same log time at a block border): merge, never drop
+    for (const [k, v] of fresh) rawByKey.set(k, v);
+    loadedRanges.push({ keys: [...fresh.keys()], bytes });
+    rawBytes += bytes;
+    while (rawBytes > RAW_BUDGET && loadedRanges.length > 1) {
+      const old = loadedRanges.shift()!;
+      for (const k of old.keys) rawByKey.delete(k);
+      rawBytes -= old.bytes;
+    }
+  })();
+  inflightRanges.set(rk, job);
+  try {
+    await job;
+  } finally {
+    inflightRanges.delete(rk);
   }
-  return seqIndex.get(key)?.[occurrence];
 }
 
 function decoderFor(topic: string) {
@@ -221,9 +255,9 @@ async function series(topic: string, path: string, maxPoints = 20000) {
   const step = Math.max(1, Math.ceil(n / maxPoints));
   const outT: number[] = [];
   const outV: number[] = [];
-  if (opened?.indexed && opened.reader && step === 1) {
+  if (opened && step === 1) {
     let i = 0;
-    for await (const m of opened.reader.readMessages({ topics: [topic] })) {
+    for await (const m of iterateAll(opened, [topic])) {
       try {
         outV.push(pick(d.decoder(m.data), path));
       } catch {
@@ -271,16 +305,14 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
         rawByKey.clear();
         loadedRanges.length = 0;
         rawBytes = 0;
-        seqIndex = undefined;
-        const file = req.file;
-        const readable = new BlobReadable(file);
+        const files = req.files?.length ? req.files : [req.file!];
         const res = await analyzeRecording(
-          {
+          files.map((file) => ({
             name: file.name,
             size: file.size,
-            readable,
-            readSlice: async (s, e) => new Uint8Array(await file.slice(s, e).arrayBuffer()),
-          },
+            readable: new BlobReadable(file),
+            readSlice: async (s: number, e: number) => new Uint8Array(await file.slice(s, e).arrayBuffer()),
+          })),
           { ranges: req.ranges, onProgress: (phase, fraction) => post({ id: req.id, op: "progress", phase, fraction }) },
         );
         opened = res.opened;

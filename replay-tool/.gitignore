@@ -6,3 +6,4 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 public/demo.mcap
+fixtures/multipart/

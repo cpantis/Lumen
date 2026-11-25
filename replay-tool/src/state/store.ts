@@ -87,6 +87,8 @@ export interface AppState {
   progress: { phase: string; fraction: number };
   error?: string;
   file?: File;
+  /** every part of the recording (several consecutive MCAP files merged by log time) */
+  files?: File[];
   analysis?: Analysis;
   view: ViewName;
   roleOverrides: Record<string, Role>;
