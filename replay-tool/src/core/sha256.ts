@@ -99,3 +99,30 @@ export async function sha256Of(
   }
   return h.digestHex();
 }
+
+/**
+ * SHA-256 of each part and of the parts concatenated in order, in one pass
+ * (a multi-part recording is identified by the hash of `cat part1 part2 …`).
+ */
+export async function sha256OfParts(
+  parts: Array<{ size: number; readSlice: (start: number, end: number) => Promise<Uint8Array> }>,
+  onProgress?: (p: number) => void,
+): Promise<{ parts: string[]; combined: string }> {
+  const total = parts.reduce((s, p) => s + p.size, 0) || 1;
+  const all = new Sha256();
+  const out: string[] = [];
+  let done = 0;
+  const CH = 8 << 20;
+  for (const p of parts) {
+    const h = new Sha256();
+    for (let s = 0; s < p.size; s += CH) {
+      const b = await p.readSlice(s, Math.min(p.size, s + CH));
+      h.update(b);
+      all.update(b);
+      done += b.length;
+      onProgress?.(Math.min(1, done / total));
+    }
+    out.push(h.digestHex());
+  }
+  return { parts: out, combined: all.digestHex() };
+}

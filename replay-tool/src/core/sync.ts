@@ -54,13 +54,14 @@ export function nearest(times: NumArray, t: number): number {
 
 /**
  * Staleness level of a panel given the age of its message and the topic's nominal period.
- * ok: age ≤ 1.5·period, warn: ≤ 3·period, stale: older, none: no message yet.
+ * ok: age ≤ 1.5·period, warn: ≤ k·period, stale (red): older than k·period (k = 3 by
+ * default, as in the Python replay script), none: no message yet.
  */
 export type Staleness = "ok" | "warn" | "stale" | "none";
-export function staleness(ageNs: number, periodNs: number): Staleness {
+export function staleness(ageNs: number, periodNs: number, k = 3): Staleness {
   if (!Number.isFinite(ageNs) || ageNs < 0) return "none";
   if (!Number.isFinite(periodNs) || periodNs <= 0) return "ok";
-  if (ageNs <= 1.5 * periodNs) return "ok";
-  if (ageNs <= 3 * periodNs) return "warn";
-  return "stale";
+  if (ageNs > k * periodNs) return "stale";
+  if (ageNs <= Math.min(1.5, k) * periodNs) return "ok";
+  return "warn";
 }

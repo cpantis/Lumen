@@ -53,8 +53,8 @@ export function StartScreen() {
           onDrop={(e) => {
             e.preventDefault();
             setOver(false);
-            const f = e.dataTransfer.files[0];
-            if (f) openFile(f);
+            const fs = [...e.dataTransfer.files].filter((f) => /\.mcap$/i.test(f.name) || e.dataTransfer.files.length === 1);
+            if (fs.length) openFile(fs);
           }}
           data-testid="dropzone"
         >
@@ -69,7 +69,7 @@ export function StartScreen() {
               <PlayCircle size={16} /> {T.loadDemo}
             </button>
           </div>
-          <input ref={input} type="file" accept=".mcap" hidden data-testid="file-input" onChange={(e) => e.target.files?.[0] && openFile(e.target.files[0])} />
+          <input ref={input} type="file" accept=".mcap" multiple hidden data-testid="file-input" onChange={(e) => e.target.files?.length && openFile([...e.target.files])} />
         </div>
         <section style={{ marginTop: 40 }} aria-labelledby="recent-h">
           <h3 id="recent-h">{T.recent}</h3>
@@ -100,13 +100,14 @@ export function LoadingScreen() {
   const T = useT();
   const p = useApp((s) => s.progress);
   const file = useApp((s) => s.file);
+  const files = useApp((s) => s.files);
   return (
     <div className="start">
       <header className="topbar"><Logo height={30} /></header>
       <main className="col" style={{ alignItems: "center", justifyContent: "center", gap: 20, padding: 32 }} id="main-content" aria-busy="true">
         <BrailleLoader label={T.analyzing} />
         <h2 style={{ fontWeight: 200 }}>{T.analyzing}</h2>
-        <p className="muted mono small">{file?.name} {file ? `· ${fmt.bytes(file.size)}` : ""}</p>
+        <p className="muted mono small">{file?.name} {file ? `· ${fmt.bytes(file.size)}` : ""}{files && files.length > 1 ? ` · ${files.length} parts` : ""}</p>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p.fraction * 100)} aria-label={p.phase}>
           <div style={{ width: `${p.fraction * 100}%` }} />
         </div>

@@ -8,6 +8,7 @@
  * published after I, we have proof that O is derived from I.
  */
 import { summarize } from "./stats";
+import { fovKey } from "./infer";
 import { lastAtOrBefore } from "./sync";
 import type { CausalEdge, FovGroup, Role, TopicData } from "./types";
 
@@ -42,6 +43,26 @@ export function plausibleSource(e: CausalEdge, inputType: string, outputType: st
   if (e.dropRatio > MAX_SOURCE_DROP) return false;
   if (NON_VISUAL.has(inputType) && (ACQUIRED_TYPES.has(outputType) || IMAGE_TYPES.has(outputType))) return false;
   return true;
+}
+
+/**
+ * Independence evidence: a topic computed from another can never exist in a frame slot
+ * where its source is missing. When ≥ 2 messages (and ≥ 1 %) of O carry a stamp that the
+ * candidate source I does not have, inside I's active span, O is not derived from I —
+ * e.g. a hardware-synchronised depth camera logged a few ms after the rgb camera.
+ */
+export function producedWithoutSource(e: CausalEdge, topics: TopicData[]): boolean {
+  const i = topics.find((t) => t.topic === e.input);
+  const o = topics.find((t) => t.topic === e.output);
+  if (!i || !o || !i.count) return false;
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < i.count; k++) {
+    if (i.stamp[k] < lo) lo = i.stamp[k];
+    if (i.stamp[k] > hi) hi = i.stamp[k];
+  }
+  let n = 0;
+  for (let j = 0; j < o.count; j++) if (e.inputIndex[j] < 0 && o.stamp[j] >= lo && o.stamp[j] <= hi) n++;
+  return n >= 2 && n / Math.max(1, o.count) >= 0.01;
 }
 
 /** Minimum median delay for a topic to count as *processed* from another (ns). */
@@ -164,7 +185,7 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
   // Pick, for each output, the earliest source in the chain.
   const typeOf = (n: string) => topics.find((t) => t.topic === n)?.type ?? "";
   const processed = raw.filter(
-    (e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && typeOf(e.output) !== "sensor_msgs/CameraInfo" && plausibleSource(e, typeOf(e.input), typeOf(e.output)),
+    (e) => summarize(e.latencyFromLog).p50 > MIN_PROCESSING_NS && typeOf(e.output) !== "sensor_msgs/CameraInfo" && plausibleSource(e, typeOf(e.input), typeOf(e.output)) && !producedWithoutSource(e, topics),
   );
   const derived = new Set(processed.map((e) => e.output));
   for (const t of topics) {
@@ -199,28 +220,65 @@ export function inferCausality(topics: TopicData[]): { edges: CausalEdge[]; fovG
     }
   }
 
-  // 4) FOV = primary image input (highest exact match) of each output
-  const fovOf = (topic: string) => topic.split("/").filter(Boolean)[0] ?? topic;
-  const groups = new Map<string, { primary: string; outputs: string[] }>();
-  for (const o of outputs) {
-    const best = edges
+  // Hardware-synchronised cameras of different FOVs share stamps, so an output "matches"
+  // every camera. When an output has a source in its own group (namespace / frame prefix),
+  // edges from other groups are dropped.
+  {
+    const key = (n: string) => {
+      const t = topics.find((x) => x.topic === n);
+      return t ? fovKey(t)?.value : undefined;
+    };
+    for (const o of outputs) {
+      const k = key(o.topic);
+      if (!k || !edges.some((e) => e.output === o.topic && key(e.input) === k)) continue;
+      for (let i = edges.length - 1; i >= 0; i--) if (edges[i].output === o.topic && key(edges[i].input) !== k) edges.splice(i, 1);
+    }
+  }
+
+  // 4) FOV: topics are grouped by namespace or header.frame_id prefix (fovKey). A key is a
+  // field of view when it contains at least one image or point-cloud input; an output
+  // without a key of its own (root topic, no frame) takes the FOV of its primary image input.
+  const keyOf = new Map(topics.map((t) => [t.topic, fovKey(t)] as const));
+  const fovKeys = new Set<string>();
+  for (const t of inputs) {
+    const k = keyOf.get(t.topic);
+    if (k && (IMAGE_TYPES.has(t.type) || t.type === "sensor_msgs/PointCloud2")) fovKeys.add(k.value);
+  }
+  const primaryOf = (o: TopicData) =>
+    edges
       .filter((e) => e.output === o.topic && e.kind === "exact" && IMAGE_TYPES.has(topics.find((t) => t.topic === e.input)!.type))
       .sort((a, b) => b.matchRate - a.matchRate || nsAffinity(b.input, o.topic) - nsAffinity(a.input, o.topic))[0];
-    if (!best) continue;
-    const fov = fovOf(best.input);
-    o.autoFov = fov;
-    const g = groups.get(fov) ?? { primary: best.input, outputs: [] };
-    g.outputs.push(o.topic);
-    groups.set(fov, g);
-  }
-  for (const t of inputs) {
-    const fov = [...groups.entries()].find(([, g]) => g.primary === t.topic)?.[0];
-    if (fov) t.autoFov = fov;
-    else {
-      // inputs sharing a namespace with a FOV (camera_info of the same camera…)
-      const ns = fovOf(t.topic);
-      if (groups.has(ns)) t.autoFov = ns;
+  for (const t of topics) {
+    const k = keyOf.get(t.topic);
+    if (k && fovKeys.has(k.value)) {
+      t.autoFov = k.value;
+      t.fovReason = k.evidence;
     }
+  }
+  for (const o of outputs) {
+    if (o.autoFov) continue;
+    const best = primaryOf(o);
+    const fov = best && topics.find((t) => t.topic === best.input)?.autoFov;
+    if (fov) {
+      o.autoFov = fov;
+      o.fovReason = `copies the stamps of ${best.input} (FOV ${fov})`;
+    }
+  }
+  const groups = new Map<string, { primary: string; outputs: string[] }>();
+  for (const o of outputs) {
+    if (!o.autoFov) continue;
+    const g = groups.get(o.autoFov) ?? { primary: "", outputs: [] };
+    g.outputs.push(o.topic);
+    if (!g.primary) {
+      const best = primaryOf(o);
+      const inFov = best && topics.find((t) => t.topic === best.input)?.autoFov === o.autoFov;
+      if (inFov) g.primary = best.input;
+    }
+    groups.set(o.autoFov, g);
+  }
+  for (const [fov, g] of groups) {
+    if (!g.primary) g.primary = inputs.find((t) => t.autoFov === fov && IMAGE_TYPES.has(t.type))?.topic ?? "";
+    if (!g.primary) groups.delete(fov);
   }
 
   const fovGroups: FovGroup[] = [];

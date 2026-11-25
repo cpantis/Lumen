@@ -5,16 +5,19 @@
  * is the one used by the current output (causal highlight).
  */
 import { useEffect, useRef, useState } from "react";
-import { pixelReadout, type Colormap, type RosImage } from "../core/image";
+import { pixelReadout, pixelValue, type Colormap, type RosImage } from "../core/image";
 import type { TopicData } from "../core/types";
-import { indexAt } from "../state/actions";
+import { effectiveDepth, indexAt } from "../state/actions";
 import { useApp, useClock, type PanelConfig } from "../state/store";
 import { PanelFrame } from "./PanelFrame";
 import { useDecoded, usePanelIndex } from "./useMessage";
 import { tr } from "../i18n";
 
-/** Draws an RGBA buffer or bitmap into a canvas, letter-boxed to the container. */
-export function drawImageFit(canvas: HTMLCanvasElement, src: { rgba?: Uint8ClampedArray; bitmap?: ImageBitmap; width?: number; height?: number }): { scale: number; ox: number; oy: number } | undefined {
+/**
+ * Draws an RGBA buffer or bitmap into a canvas, letter-boxed to the container.
+ * Class maps (`classes`) are always resampled nearest-neighbour so labels never blend.
+ */
+export function drawImageFit(canvas: HTMLCanvasElement, src: { rgba?: Uint8ClampedArray; bitmap?: ImageBitmap; width?: number; height?: number; classes?: number }): { scale: number; ox: number; oy: number } | undefined {
   const parent = canvas.parentElement!;
   const W = parent.clientWidth, H = parent.clientHeight;
   const dpr = devicePixelRatio || 1;
@@ -29,7 +32,7 @@ export function drawImageFit(canvas: HTMLCanvasElement, src: { rgba?: Uint8Clamp
   if (!iw || !ih) return undefined;
   const scale = Math.min(W / iw, H / ih);
   const ox = (W - iw * scale) / 2, oy = (H - ih * scale) / 2;
-  ctx.imageSmoothingEnabled = scale < 1;
+  ctx.imageSmoothingEnabled = !src.classes && scale < 1;
   if (src.bitmap) ctx.drawImage(src.bitmap, ox, oy, iw * scale, ih * scale);
   else if (src.rgba) {
     const off = new OffscreenCanvas(iw, ih);
@@ -69,10 +72,16 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
   const { index, matchedFrom } = usePanelIndex(topic, follow);
   const [cmap, setCmap] = useState<Colormap>((cfg.options?.colormap as Colormap) ?? "turbo");
   const [autoRange, setAutoRange] = useState(true);
-  const [range, setRange] = useState({ min: 0.3, max: 15 });
+  const depthUnit = useApp((s) => effectiveDepth(topic, s).unit);
+  const depthMax = useApp((s) => effectiveDepth(topic, s).maxM);
+  const depth = { unit: depthUnit, maxM: depthMax };
+  const [range, setRange] = useState({ min: 0, max: 15 });
   const isDepthTopic = /16UC1|32FC1|mono16/i.test(topic.details["encoding"] ?? "");
-  const scale = /16UC1|mono16/i.test(topic.details["encoding"] ?? "") ? 1000 : 1;
-  const render = isDepthTopic ? { colormap: cmap, range: autoRange ? undefined : { min: range.min * scale, max: range.max * scale } } : undefined;
+  // raw units per metre: 16UC1 is mm unless the unit is overridden
+  const scale = (depth.unit ?? (/16UC1|mono16/i.test(topic.details["encoding"] ?? "") ? "mm" : "m")) === "mm" ? 1000 : 1;
+  // fixed display range for the whole recording: 0 – inferred valid maximum (or override); 0 = no data (black)
+  const fixedMax = depth.maxM ?? 15;
+  const render = isDepthTopic ? { colormap: cmap, range: autoRange ? { min: 0, max: fixedMax * scale } : { min: range.min * scale, max: range.max * scale } } : undefined;
   const { msg } = useDecoded(topic.topic, index, render);
   const canvas = useRef<HTMLCanvasElement>(null);
   const geom = useRef<{ scale: number; ox: number; oy: number }>();
@@ -93,7 +102,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
     const x = Math.floor((e.clientX - r.left - g.ox) / g.scale);
     const y = Math.floor((e.clientY - r.top - g.oy) / g.scale);
     const img = msg.msg as RosImage;
-    if (msg.rgba) setReadout(x >= 0 && y >= 0 && x < img.width && y < img.height ? `(${x}, ${y}) ${pixelReadout(img, x, y)}` : "");
+    if (msg.rgba) setReadout(x >= 0 && y >= 0 && x < img.width && y < img.height ? `(${x}, ${y}) ${msg.classes ? `class ${pixelValue(img, x, y)}` : pixelReadout(img, x, y, isDepthTopic ? depth.unit : undefined)}` : "");
     else setReadout(x >= 0 && y >= 0 ? `(${x}, ${y})` : "");
   };
 
@@ -103,6 +112,7 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       cfg={cfg}
       topic={topic}
       index={index}
+      shown={msg ? msg.index : -1}
       matchedFrom={matchedFrom}
       error={msg?.error}
       toolbar={
@@ -117,9 +127,9 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       }
       footer={
         <>
-          <span>{msg?.width ? `${msg.width}×${msg.height} ${img?.encoding ?? (msg?.msg as { format?: string })?.format ?? ""}` : ""}</span>
+          <span>{msg?.width ? `${msg.width}×${msg.height} ${img?.encoding ?? (msg?.msg as { format?: string })?.format ?? ""}${msg.classes ? ` · class map, ${msg.classes} classes` : ""}` : ""}</span>
           <span style={{ color: "var(--text)" }}>{readout}</span>
-          <UsageInfo topic={topic} index={index} />
+          <UsageInfo topic={topic} index={msg ? msg.index : -1} />
         </>
       }
     >
@@ -128,8 +138,8 @@ export function ImagePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
       <canvas ref={canvas} onMouseMove={onMove} onMouseLeave={() => setReadout("")} aria-label={`Image ${topic.topic}`} role="img" />
       {isDepthTopic && (
         <div className="row xs" style={{ position: "absolute", left: 8, bottom: 6, background: "var(--surface)", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--border)" }} onMouseDown={(e) => e.stopPropagation()}>
-          <label className="row" style={{ gap: 4 }}>
-            <input type="checkbox" checked={autoRange} onChange={(e) => setAutoRange(e.target.checked)} /> auto
+          <label className="row" style={{ gap: 4 }} data-tip="Fixed range for the whole recording: 0 – the observed valid maximum (Inventory → Inferred settings). Uncheck to set it here.">
+            <input type="checkbox" checked={autoRange} onChange={(e) => setAutoRange(e.target.checked)} /> 0–{fixedMax} m
           </label>
           {!autoRange && (
             <>

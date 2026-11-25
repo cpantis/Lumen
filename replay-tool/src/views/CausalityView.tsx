@@ -17,6 +17,7 @@ import { traceLine } from "../state/trace";
 import { Plot } from "../ui/Plot";
 import { fmt, Kv, Section, Stat } from "../ui/primitives";
 import { tr } from "../i18n";
+import { ParitySection } from "./ParitySection";
 
 function Diagram() {
   const s = useApp((st) => st);
@@ -178,6 +179,7 @@ export function CausalityView() {
         {a.edges.length ? <Diagram /> : <div className="callout warn">{tr("Nicio ieșire nu copiază stamp-urile unei intrări: cauzalitatea nu poate fi dovedită din stamp-uri. Clasifică manual topicurile în Inventar.")}</div>}
       </Section>
 
+      <ParitySection />
       <Section title={tr("Latență și cadre sărite, pe perechi intrare → ieșire")}>
         <div className="table-wrap" tabIndex={0} style={{ maxHeight: 300 }}>
           <table className="t">

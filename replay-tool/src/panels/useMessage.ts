@@ -34,43 +34,59 @@ export function usePanelIndex(t: TopicData | undefined, followOutput?: string): 
 export function useDecoded(topic: string | undefined, index: number, render?: RenderOptions): { msg?: DecodedMessage; loading: boolean } {
   const [msg, setMsg] = useState<DecodedMessage | undefined>();
   const [loading, setLoading] = useState(false);
-  const inflight = useRef(false);
-  const wanted = useRef<{ index: number; key: string }>({ index: -1, key: "" });
   const renderKey = JSON.stringify(render ?? {});
   const phase = useApp((s) => s.phase);
+  // One fetch loop per (topic, render, phase). Index changes only update `wanted`:
+  // the loop always shows the frame it just received (even if the cursor has moved on)
+  // and then fetches the newest wanted one. Cancelling on every index change would,
+  // during playback, discard every result whenever decoding is slower than the frame rate.
+  const session = useRef<{ wanted: number; running: boolean; alive: boolean; kick: () => void }>();
 
   useEffect(() => {
-    if (!topic || index < 0 || phase !== "ready") {
+    if (!topic || phase !== "ready") return;
+    const st = { wanted: -1, running: false, alive: true, kick: () => undefined as void };
+    st.kick = () => {
+      if (st.running || !st.alive) return;
+      st.running = true;
+      setLoading(true);
+      (async () => {
+        let last = -2;
+        while (st.alive && st.wanted >= 0 && st.wanted !== last) {
+          const w = st.wanted;
+          try {
+            const m = await worker.get(topic, w, render, app.get().playing ? 4 : 2);
+            if (!st.alive) return;
+            setMsg(m);
+          } catch {
+            /* worker reset */
+          }
+          last = w;
+        }
+        st.running = false;
+        if (st.alive) setLoading(false);
+      })();
+    };
+    session.current = st;
+    return () => {
+      st.alive = false;
+      if (session.current === st) session.current = undefined;
+      setMsg(undefined);
+      setLoading(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic, renderKey, phase]);
+
+  useEffect(() => {
+    const st = session.current;
+    if (!topic || phase !== "ready") return;
+    if (index < 0) {
+      if (st) st.wanted = -1;
       setMsg(undefined);
       return;
     }
-    const key = `${topic}#${index}#${renderKey}`;
-    wanted.current = { index, key };
-    let cancelled = false;
-    const run = async () => {
-      if (inflight.current) return;
-      inflight.current = true;
-      setLoading(true);
-      while (!cancelled) {
-        const w = wanted.current;
-        try {
-          const m = await worker.get(topic, w.index, render, app.get().playing ? 4 : 2);
-          if (cancelled) break;
-          setMsg(m);
-        } catch {
-          /* worker reset */
-        }
-        if (wanted.current.key === w.key) break;
-      }
-      inflight.current = false;
-      setLoading(false);
-    };
-    run();
-    return () => {
-      cancelled = true;
-      inflight.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!st) return;
+    st.wanted = index;
+    st.kick();
   }, [topic, index, renderKey, phase]);
 
   return { msg, loading };

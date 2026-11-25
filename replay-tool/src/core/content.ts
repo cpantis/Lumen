@@ -9,6 +9,7 @@
 import { shortType } from "./decode";
 import { encodingInfo, isDepthLike, pixelValue, type RosImage } from "./image";
 import { parsePointCloud, type RosPointCloud2 } from "./pointcloud";
+import { DEPTH_BIN_M } from "./infer";
 
 export interface ContentSample {
   /** message carries no payload (0 points, 0 pixels, empty data) */
@@ -108,7 +109,7 @@ class Acc {
   }
 }
 
-function imageMetrics(img: RosImage, r: PlausibleRanges): ContentSample {
+function imageMetrics(img: RosImage, r: PlausibleRanges, depthHist?: Uint32Array): ContentSample {
   const info = encodingInfo(img.encoding);
   const pixels = img.width * img.height;
   const hash = sampleHash(img.data);
@@ -121,6 +122,7 @@ function imageMetrics(img: RosImage, r: PlausibleRanges): ContentSample {
     for (let i = 0; i < pixels; i += stepPx) {
       const v = pixelValue(img, i % img.width, Math.floor(i / img.width));
       acc.push(v * scale, r.depthMin, r.depthMax);
+      if (depthHist && v > 0 && Number.isFinite(v)) depthHist[Math.min(depthHist.length - 1, Math.floor((v * scale) / DEPTH_BIN_M))]++;
     }
   } else {
     // intensity statistics on channel 0; "zero" = fully black pixel, oor = saturated (255)
@@ -221,13 +223,14 @@ function genericMetrics(m: unknown): ContentSample {
 }
 
 /** Computes the content sample for a decoded message of the given schema type. */
-export function contentMetrics(schemaName: string, msg: unknown, ranges: PlausibleRanges = DEFAULT_RANGES): ContentSample {
+/** @param depthHist optional recording-wide histogram of valid depth values (bins of DEPTH_BIN_M metres) */
+export function contentMetrics(schemaName: string, msg: unknown, ranges: PlausibleRanges = DEFAULT_RANGES, depthHist?: Uint32Array): ContentSample {
   const t = shortType(schemaName);
   const m = msg as Record<string, any>;
   try {
     switch (t) {
       case "sensor_msgs/Image":
-        return imageMetrics(m as RosImage, ranges);
+        return imageMetrics(m as RosImage, ranges, depthHist);
       case "sensor_msgs/CompressedImage": {
         const data: Uint8Array = m.data ?? new Uint8Array();
         return { ...EMPTY, empty: data.length === 0, elements: data.length, hash: sampleHash(data) };

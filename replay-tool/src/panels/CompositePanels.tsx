@@ -76,6 +76,7 @@ export function OverlayPanel({ cfg, topic, cloud }: { cfg: PanelConfig; topic: T
       cfg={cfg}
       topic={cloud ?? topic}
       index={ci}
+      shown={pc ? pc.index : -1}
       title={`Projection ${cloud?.topic ?? "?"} → ${topic.topic}`}
       toolbar={<input type="range" min={0.1} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(+e.target.value)} aria-label={tr("Opacitate puncte")} data-tip={tr("Opacitatea punctelor proiectate")} style={{ width: 60 }} />}
       footer={
@@ -158,6 +159,7 @@ export function DiffPanel({ cfg, a: ta, b: tb }: { cfg: PanelConfig; a: TopicDat
       cfg={cfg}
       topic={ta}
       index={ia}
+      shown={ma ? ma.index : -1}
       title={`Comparison ${ta.topic} ⇄ ${tb?.topic ?? "?"}`}
       toolbar={
         <>

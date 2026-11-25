@@ -5,6 +5,8 @@
 import defaultThresholds from "../../config/thresholds.yaml?raw";
 import { evaluate, parseThresholds, type EffectiveRoles, type RequirementResult } from "../core/requirements";
 import { firstAfter, lastAtOrBefore } from "../core/sync";
+import { computeParity, type ParityReport } from "../core/parity";
+import { messageAt, stampOrder, timeOnBase } from "../core/timebase";
 import type { Analysis, Role, TopicData } from "../core/types";
 import { worker } from "../worker/client";
 import { viewEnabled } from "./features";
@@ -18,11 +20,82 @@ export function effectiveRole(t: TopicData, s: AppState = app.get()): Role {
 export function effectiveFov(t: TopicData, s: AppState = app.get()): string | undefined {
   return s.fovOverrides[t.topic] ?? t.autoFov;
 }
+// ---------------------------------------------------------------- inferred settings + overrides
+/** Nominal period (ns) used for staleness: user override, else the inferred median stamp interval. */
+export function effectivePeriod(t: TopicData, s: AppState = app.get()): number {
+  return s.periodOverrides[t.topic] ?? t.inference?.framePeriodNs?.value ?? t.inference?.nominalPeriodNs.value ?? t.rate.medianPeriodNs;
+}
+export function effectiveDepth(t: TopicData, s: AppState = app.get()): { unit?: "mm" | "m"; maxM?: number } {
+  const o = s.depthOverrides[t.topic] ?? {};
+  return { unit: o.unit ?? t.inference?.depthUnit?.value, maxM: o.maxM ?? t.inference?.depthMaxM?.value };
+}
+export function effectiveCloudColour(t: TopicData, s: AppState = app.get()): string {
+  return s.cloudColourOverrides[t.topic] ?? t.inference?.cloudColour?.value ?? "distance";
+}
+
+let parityKey = "";
+let parityCache: ParityReport | undefined;
+/** Python-suite metrics for every output (memoised on roles and trigger overrides). */
+export function parity(s: AppState = app.get()): ParityReport | undefined {
+  const a = s.analysis;
+  if (!a) return undefined;
+  const key = `${a.sha256}|${a.analyzedAt}|${JSON.stringify(s.roleOverrides)}|${JSON.stringify(s.fovOverrides)}|${JSON.stringify(s.triggerOverrides)}`;
+  if (key !== parityKey || !parityCache) {
+    parityKey = key;
+    parityCache = computeParity(a.topics, (t) => effectiveRole(t, s) === "output", (t) => effectiveRole(t, s) === "input", a.durationNs, s.triggerOverrides, (t) => effectiveFov(t, s));
+  }
+  return parityCache;
+}
+export function effectiveTrigger(output: string, s: AppState = app.get()): string | undefined {
+  return parity(s)?.outputs.find((o) => o.output === output)?.trigger;
+}
+
+/** Every user override, as saved in deep links and exports. */
+export interface Overrides {
+  roles?: Record<string, Role>;
+  fovs?: Record<string, string>;
+  triggers?: Record<string, string>;
+  periods_ms?: Record<string, number>;
+  depth?: Record<string, { unit?: "mm" | "m"; maxM?: number }>;
+  cloud_colour?: Record<string, string>;
+  stale_k?: number;
+}
+const nonEmpty = <T extends object>(o: T) => (Object.keys(o).length ? o : undefined);
+export function currentOverrides(s: AppState = app.get()): Overrides {
+  const o: Overrides = {
+    roles: nonEmpty(s.roleOverrides),
+    fovs: nonEmpty(s.fovOverrides),
+    triggers: nonEmpty(s.triggerOverrides),
+    periods_ms: nonEmpty(Object.fromEntries(Object.entries(s.periodOverrides).map(([k, v]) => [k, v / 1e6]))),
+    depth: nonEmpty(s.depthOverrides),
+    cloud_colour: nonEmpty(s.cloudColourOverrides),
+    stale_k: s.staleK !== 3 ? s.staleK : undefined,
+  };
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Overrides;
+}
+export function applyOverrides(o: Overrides): void {
+  app.set({
+    roleOverrides: o.roles ?? {},
+    fovOverrides: o.fovs ?? {},
+    triggerOverrides: o.triggers ?? {},
+    periodOverrides: Object.fromEntries(Object.entries(o.periods_ms ?? {}).map(([k, v]) => [k, v * 1e6])),
+    depthOverrides: o.depth ?? {},
+    cloudColourOverrides: o.cloud_colour ?? {},
+    staleK: o.stale_k ?? 3,
+  });
+}
+
 export function roles(s: AppState = app.get()): EffectiveRoles {
   return { role: (t) => effectiveRole(t, s), fov: (t) => effectiveFov(t, s) };
 }
 export function fovList(a: Analysis, s: AppState = app.get()): string[] {
   return [...new Set(a.topics.map((t) => effectiveFov(t, s)).filter((x): x is string => !!x))].sort();
+}
+/** Colour of the k-th field of view (two theme tokens, then distinct hues for more FOVs). */
+export function fovColor(k: number): string {
+  if (k === 0) return "var(--role-fov1)";
+  if (k === 1) return "var(--role-fov2)";
+  return k < 0 ? "var(--role-unknown)" : `hsl(${(30 + k * 67) % 360} 65% 62%)`;
 }
 /** Colour token for a topic (consistent everywhere: timeline, panel head, plots). */
 export function topicColor(t: TopicData, s: AppState = app.get()): string {
@@ -30,36 +103,18 @@ export function topicColor(t: TopicData, s: AppState = app.get()): string {
   if (role === "input") return "var(--role-input)";
   if (role === "unknown") return "var(--role-unknown)";
   const fovs = s.analysis ? fovList(s.analysis, s) : [];
-  const i = fovs.indexOf(effectiveFov(t, s) ?? "");
-  return i === 1 ? "var(--role-fov2)" : i === 0 ? "var(--role-fov1)" : "var(--role-unknown)";
+  return fovColor(fovs.indexOf(effectiveFov(t, s) ?? ""));
 }
 
 // ---------------------------------------------------------------- time indexing
-const stampIndex = new WeakMap<TopicData, { sorted: Float64Array; order: Int32Array }>();
-/** Sorted header stamps (for header.stamp time source) with the original indices. */
-export function stampOrder(t: TopicData) {
-  let e = stampIndex.get(t);
-  if (!e) {
-    const order = Int32Array.from({ length: t.count }, (_, i) => i).sort((a, b) => t.stamp[a] - t.stamp[b]);
-    e = { sorted: Float64Array.from(order, (i) => t.stamp[i]), order };
-    stampIndex.set(t, e);
-  }
-  return e;
-}
-
+export { stampOrder } from "../core/timebase";
 /** Index of the message shown at time `time` for a topic, under the chosen time source. */
 export function indexAt(t: TopicData, time: number, source: AppState["timeSource"] = app.get().timeSource): number {
-  if (source === "header" && t.hasHeader) {
-    const { sorted, order } = stampOrder(t);
-    const k = lastAtOrBefore(sorted, time);
-    return k < 0 ? -1 : order[k];
-  }
-  return lastAtOrBefore(t.log, time);
+  return messageAt(t, time, source);
 }
-
 /** Time of message i under the chosen time source. */
 export function timeOf(t: TopicData, i: number, source: AppState["timeSource"] = app.get().timeSource): number {
-  return source === "header" && t.hasHeader ? t.stamp[i] : t.log[i];
+  return timeOnBase(t, i, source);
 }
 
 // ---------------------------------------------------------------- evaluation memo
@@ -138,6 +193,7 @@ function persistFileState() {
   safeSet(perFile(s.analysis.sha256), {
     roleOverrides: s.roleOverrides,
     fovOverrides: s.fovOverrides,
+    overrides: currentOverrides(s),
     notes: s.notes,
     bugs: s.bugs,
     calibrations: s.calibrations,
@@ -154,38 +210,93 @@ app.subscribe(() => {
   persistTimer = setTimeout(persistFileState, 400);
 });
 
-/** Export of the classification (roles + FOV) as JSON, importable on another machine. */
+/** Export of the classification and every override as JSON, importable on another machine. */
 export function classificationJson(): string {
   const s = app.get();
   const a = s.analysis!;
+  const par = parity(s);
   return JSON.stringify(
     {
       file: a.fileName,
       sha256: a.sha256,
-      topics: Object.fromEntries(a.topics.map((t) => [t.topic, { role: effectiveRole(t, s), fov: effectiveFov(t, s) ?? null, auto: { role: t.autoRole, fov: t.autoFov ?? null, reason: t.roleReason } }])),
+      files: a.files,
+      overrides: currentOverrides(s),
+      topics: Object.fromEntries(
+        a.topics.map((t) => [
+          t.topic,
+          {
+            role: effectiveRole(t, s),
+            fov: effectiveFov(t, s) ?? null,
+            trigger: par?.outputs.find((o) => o.output === t.topic)?.trigger ?? null,
+            nominal_period_ms: +(effectivePeriod(t, s) / 1e6).toFixed(6),
+            auto: { role: t.autoRole, fov: t.autoFov ?? null, reason: t.roleReason, fov_reason: t.fovReason ?? null, trigger: par?.outputs.find((o) => o.output === t.topic)?.inference.trigger ?? null },
+          },
+        ]),
+      ),
     },
     null,
     2,
   );
 }
 export function importClassification(json: string): void {
-  const obj = JSON.parse(json) as { topics: Record<string, { role: Role; fov: string | null }> };
-  const roleOverrides: Record<string, Role> = {};
-  const fovOverrides: Record<string, string> = {};
-  for (const [k, v] of Object.entries(obj.topics ?? {})) {
-    roleOverrides[k] = v.role;
-    if (v.fov) fovOverrides[k] = v.fov;
+  const obj = JSON.parse(json) as { overrides?: Overrides; topics: Record<string, { role: Role; fov: string | null }> };
+  if (obj.overrides) applyOverrides(obj.overrides);
+  else {
+    const roleOverrides: Record<string, Role> = {};
+    const fovOverrides: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj.topics ?? {})) {
+      roleOverrides[k] = v.role;
+      if (v.fov) fovOverrides[k] = v.fov;
+    }
+    app.set({ roleOverrides, fovOverrides });
   }
-  app.set({ roleOverrides, fovOverrides });
   toast("Classification imported");
 }
 
 // ---------------------------------------------------------------- default layout
-export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+const VISUAL = /Image|PointCloud2|Imu|OccupancyGrid|LaserScan|Marker|TFMessage|Pose/;
+
+/**
+ * Preset "inputs and outputs per FOV" (parity with the Python replay script): one row per
+ * inferred field of view, its inputs first then its outputs, one panel per topic; topics
+ * without a FOV in a last row. Works for any number of FOVs and topics (rows wrap).
+ */
+export function fovRowsPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
   const panels: PanelConfig[] = [];
   const layout: Layout[] = [];
-  const visualTypes = /Image|PointCloud2|Imu|OccupancyGrid|LaserScan|Marker|TFMessage|Pose/;
-  const ins = a.topics.filter((t) => effectiveRole(t, s) === "input" && visualTypes.test(t.type) && t.count > 0);
+  const shown = (t: TopicData) => t.count > 0 && (VISUAL.test(t.type) || effectiveRole(t, s) === "output") && t.type !== "sensor_msgs/CameraInfo";
+  const order = (t: TopicData) => (effectiveRole(t, s) === "input" ? 0 : effectiveRole(t, s) === "output" ? 1 : 2);
+  const rows: TopicData[][] = fovList(a, s).map((f) => a.topics.filter((t) => effectiveFov(t, s) === f && shown(t)).sort((x, y) => order(x) - order(y) || x.topic.localeCompare(y.topic)));
+  const rest = a.topics.filter((t) => !effectiveFov(t, s) && shown(t)).sort((x, y) => order(x) - order(y) || x.topic.localeCompare(y.topic));
+  if (rest.length) rows.push(rest);
+  let y = 0;
+  for (const row of rows.filter((r) => r.length)) {
+    const perLine = Math.min(row.length, 4);
+    const w = Math.floor(12 / perLine);
+    for (let k = 0; k < row.length; k += perLine) {
+      const line = row.slice(k, k + perLine);
+      const h = line.every((t) => /Imu|TFMessage/.test(t.type)) ? 5 : 7;
+      line.forEach((t, j) => {
+        const id = uid();
+        panels.push({ id, topic: t.topic, kind: "auto" });
+        layout.push({ i: id, x: j * w, y, w, h, minW: 2, minH: 3 });
+      });
+      y += h;
+    }
+  }
+  return { panels, layout };
+}
+
+/** Default layout = the per-FOV preset. */
+export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+  return fovRowsPanels(a, s);
+}
+
+/** Preset "inputs | outputs FOV 1 | outputs FOV 2" (three columns, the original layout). */
+export function columnPanels(a: Analysis, s: AppState = app.get()): { panels: PanelConfig[]; layout: Layout[] } {
+  const panels: PanelConfig[] = [];
+  const layout: Layout[] = [];
+  const ins = a.topics.filter((t) => effectiveRole(t, s) === "input" && VISUAL.test(t.type) && t.count > 0);
   const fovs = fovList(a, s);
   const columns: TopicData[][] = [ins];
   for (const f of fovs.slice(0, 2)) columns.push(a.topics.filter((t) => effectiveRole(t, s) === "output" && effectiveFov(t, s) === f));
@@ -206,19 +317,33 @@ export function defaultPanels(a: Analysis, s: AppState = app.get()): { panels: P
 }
 
 // ---------------------------------------------------------------- opening files
-export async function openFile(file: File): Promise<void> {
+/**
+ * Opens one MCAP file, or several consecutive parts of one recording (merged by log time;
+ * parts are ordered by their first log time, whatever the order they were picked in).
+ */
+export async function openFile(input: File | File[]): Promise<void> {
+  const files = (Array.isArray(input) ? input : [input]).slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const file = files.length === 1 ? files[0] : new File([], files.map((f) => f.name).join(" + "));
+  Object.defineProperty(file, "size", { value: files.reduce((n, f) => n + f.size, 0) });
   worker.reset();
-  app.set({ phase: "loading", file, progress: { phase: "opening", fraction: 0 }, error: undefined, playing: false });
-  pushRecent(file);
+  app.set({ phase: "loading", file, files, progress: { phase: "opening", fraction: 0 }, error: undefined, playing: false });
+  for (const f of files) pushRecent(f);
   try {
     const s0 = app.get();
-    const analysis = await worker.open(file, (phase, fraction) => app.set({ progress: { phase, fraction } }), s0.thresholds?.plausible_ranges);
-    const saved = safeGet<Partial<AppState>>(perFile(analysis.sha256), {});
+    const analysis = await worker.open(files, (phase, fraction) => app.set({ progress: { phase, fraction } }), s0.thresholds?.plausible_ranges);
+    const saved = safeGet<Partial<AppState> & { overrides?: Overrides }>(perFile(analysis.sha256), {});
+    const url0 = readUrl();
+    const ov: Overrides = url0.overrides ?? saved.overrides ?? { roles: saved.roleOverrides, fovs: saved.fovOverrides };
     app.set({
       analysis,
       phase: "ready",
-      roleOverrides: saved.roleOverrides ?? {},
-      fovOverrides: saved.fovOverrides ?? {},
+      roleOverrides: ov.roles ?? {},
+      fovOverrides: ov.fovs ?? {},
+      triggerOverrides: ov.triggers ?? {},
+      periodOverrides: Object.fromEntries(Object.entries(ov.periods_ms ?? {}).map(([k, v]) => [k, v * 1e6])),
+      depthOverrides: ov.depth ?? {},
+      cloudColourOverrides: ov.cloud_colour ?? {},
+      staleK: ov.stale_k ?? 3,
       // notes saved by older versions used Romanian tags
       notes: (saved.notes ?? []).map((n) => ({ ...n, tag: ({ întrebare: "question", presupunere: "assumption", anomalie: "anomaly" } as Record<string, Note["tag"]>)[n.tag] ?? n.tag })),
       bugs: saved.bugs ?? [],
@@ -237,6 +362,7 @@ export async function openFile(file: File): Promise<void> {
     else if (saved.panels?.length) app.set({ panels: saved.panels, layout: saved.layout ?? [] });
     else app.set(defaultPanels(analysis, s));
     if (url.view && viewEnabled(url.view as AppState["view"])) app.set({ view: url.view as AppState["view"] });
+    if (url.base) app.set({ timeSource: url.base });
     // start at the first output message so the panels are not empty on open
     const firstOut = Math.min(...analysis.topics.filter((t) => effectiveRole(t, app.get()) === "output" && t.count).map((t) => t.log[0]));
     const startT = url.t !== undefined && Number.isFinite(url.t) ? url.t : Number.isFinite(firstOut) ? firstOut : 0;
@@ -368,6 +494,8 @@ export function setSpeed(dir: 1 | -1): void {
 interface UrlState {
   t?: number;
   view?: string;
+  base?: AppState["timeSource"];
+  overrides?: Overrides;
   panels?: PanelConfig[];
   layout?: Layout[];
 }
@@ -376,6 +504,14 @@ export function readUrl(): UrlState {
   const out: UrlState = {};
   if (h.has("t")) out.t = Number(h.get("t")) * 1e9;
   if (h.has("view")) out.view = h.get("view")!;
+  if (h.get("base") === "header" || h.get("base") === "log") out.base = h.get("base") as AppState["timeSource"];
+  if (h.has("o")) {
+    try {
+      out.overrides = JSON.parse(decodeURIComponent(escape(atob(h.get("o")!)))) as Overrides;
+    } catch {
+      /* ignore malformed */
+    }
+  }
   if (h.has("p")) {
     try {
       const raw = JSON.parse(decodeURIComponent(escape(atob(h.get("p")!)))) as Array<[string, string, number, number, number, number, string?, string?]>;
@@ -398,6 +534,9 @@ export function writeUrl(): void {
   params.set("t", (clock.get().t / 1e9).toFixed(3));
   params.set("view", s.view);
   params.set("p", btoa(unescape(encodeURIComponent(JSON.stringify(p)))));
+  if (s.timeSource !== "log") params.set("base", s.timeSource);
+  const ov = currentOverrides(s);
+  if (Object.keys(ov).length) params.set("o", btoa(unescape(encodeURIComponent(JSON.stringify(ov)))));
   history.replaceState(null, "", `#${s.view === "styleguide" ? "/styleguide" : ""}?${params.toString()}`);
 }
 let urlTimer: ReturnType<typeof setTimeout> | undefined;

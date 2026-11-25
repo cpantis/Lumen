@@ -6,9 +6,9 @@ import { Camera, Contrast, Film, HelpCircle, Moon, PanelRight, Search, Settings,
 import { useEffect, useMemo, useState } from "react";
 import { parseTimeInput } from "../core/time";
 import { setLang, useT, type Lang } from "../i18n";
-import { closeFile, defaultPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
+import { closeFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, type ViewName } from "../state/store";
-import { downloadSnapshot, exportVideo } from "../export/snapshot";
+import { downloadSnapshot } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
 import { useDecoded } from "../panels/useMessage";
 import { AUTHOR, fmt, Kv, Logo, Modal } from "./primitives";
@@ -46,7 +46,7 @@ export function TopBar() {
         <Search size={16} /> <kbd style={{ background: "transparent", color: "inherit" }}>⌘K</kbd>
       </button>
       <button className="btn icon ghost hide-narrow" onClick={downloadSnapshot} aria-label={T.exportPng} data-tip={T.exportPng}><Camera size={18} /></button>
-      <button className="btn icon ghost hide-narrow" onClick={() => exportVideo()} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — WebM`}><Film size={18} /></button>
+      <button className="btn icon ghost hide-narrow" onClick={() => app.set({ exportOpen: "video" })} aria-label={T.exportVideo} data-tip={`${T.exportVideo} — MP4, deterministic; PNG snapshots at chosen times`}><Film size={18} /></button>
       <button className="btn icon ghost hide-narrow" aria-pressed={inspectorOpen} onClick={() => app.set({ inspectorOpen: !inspectorOpen })} aria-label={T.inspector} data-tip={`${T.inspector} (I)`}><PanelRight size={18} /></button>
       <button
         className="btn icon ghost"
@@ -150,7 +150,8 @@ export function CommandPalette() {
     list.push(
       { group: "action", label: "Play / pause", run: togglePlay },
       { group: "action", label: T.exportPng, run: downloadSnapshot },
-      { group: "action", label: T.exportVideo, run: () => exportVideo() },
+      { group: "action", label: T.exportVideo, run: () => app.set({ exportOpen: "video" }) },
+      { group: "action", label: "PNG snapshots at chosen times…", run: () => app.set({ exportOpen: "snapshots" }) },
       ...(features.issues
         ? [
             { group: "action", label: T.createBug, run: () => openBugDraft() },
@@ -161,6 +162,8 @@ export function CommandPalette() {
       { group: "action", label: "Strict profile", run: () => app.set({ profile: "strict" }) },
       { group: "action", label: T.tour, run: () => app.set({ tourStep: 0 }) },
       { group: "layout", label: T.layoutReset, run: () => app.set(defaultPanels(app.get().analysis!)) },
+      { group: "layout", label: "Layout: inputs and outputs per FOV (one row per FOV)", run: () => app.set(fovRowsPanels(app.get().analysis!)) },
+      { group: "layout", label: "Layout: inputs | outputs FOV 1 | outputs FOV 2 (columns)", run: () => app.set(columnPanels(app.get().analysis!)) },
     );
     if (a) {
       for (const t of a.topics) list.push({ group: "topic", label: `${t.topic} · ${t.type}`, run: () => { app.set({ view: "inventory" }); } });
@@ -170,13 +173,14 @@ export function CommandPalette() {
     }
     return list;
   }, [s.analysis, s.profile, s.reports, s.bugs, T]); // eslint-disable-line react-hooks/exhaustive-deps
-  const tq = parseTimeInput(q);
-  const filtered = useMemo(() => {
-    const ql = q.toLowerCase();
+  const filterFor = (query: string): Cmd[] => {
+    const ql = query.toLowerCase();
+    const tq = parseTimeInput(query);
     const out = cmds.filter((c) => !ql || c.label.toLowerCase().includes(ql) || c.group.includes(ql)).slice(0, 60);
     if (tq !== undefined && s.analysis) out.unshift({ group: "time", label: `Jump to ${(tq / 1e9).toFixed(3)} s`, run: () => { setPlaying(false); seek(tq); app.set({ view: "replay" }); } });
     return out;
-  }, [cmds, q, tq, s.analysis]);
+  };
+  const filtered = useMemo(() => filterFor(q), [cmds, q, s.analysis]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setSel(0), [q]);
   if (!open) return null;
   const close = () => {
@@ -200,9 +204,14 @@ export function CommandPalette() {
             if (e.key === "Escape") close();
             if (e.key === "ArrowDown") (e.preventDefault(), setSel(Math.min(filtered.length - 1, sel + 1)));
             if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(0, sel - 1)));
-            if (e.key === "Enter" && filtered[sel]) {
-              filtered[sel].run();
-              close();
+            if (e.key === "Enter") {
+              // read the live input value: Enter can arrive before React re-rendered the last keystroke
+              const live = e.currentTarget.value;
+              const cmd = live === q ? filtered[sel] : filterFor(live)[0];
+              if (cmd) {
+                cmd.run();
+                close();
+              }
             }
           }}
         />

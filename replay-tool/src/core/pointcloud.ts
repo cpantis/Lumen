@@ -84,3 +84,28 @@ export function parsePointCloud(pc: RosPointCloud2): ParsedCloud {
   }
   return { count, positions, fields, fieldNames: usable.map((f) => f.name) };
 }
+
+/**
+ * Per-point colour from an rgb/rgba field (PCL packed 0x00RRGGBB, stored as FLOAT32 or
+ * UINT32): the raw 32 bits are reinterpreted, never converted. undefined without such a field.
+ */
+export function cloudRgb(pc: RosPointCloud2, fieldName?: string): Uint8Array | undefined {
+  const f = pc.fields.find((x) => (fieldName ? x.name === fieldName : /^rgba?$/i.test(x.name)));
+  if (!f || (SIZE[f.datatype] ?? 0) !== 4) return undefined;
+  const count = pc.width * pc.height;
+  const dv = new DataView(pc.data.buffer, pc.data.byteOffset, pc.data.byteLength);
+  const le = !pc.is_bigendian;
+  const out = new Uint8Array(count * 3);
+  for (let r = 0; r < pc.height; r++) {
+    for (let c = 0; c < pc.width; c++) {
+      const i = r * pc.width + c;
+      const off = r * pc.row_step + c * pc.point_step + f.offset;
+      if (off + 4 > pc.data.byteLength) continue;
+      const v = dv.getUint32(off, le);
+      out[i * 3] = (v >>> 16) & 255;
+      out[i * 3 + 1] = (v >>> 8) & 255;
+      out[i * 3 + 2] = v & 255;
+    }
+  }
+  return out;
+}

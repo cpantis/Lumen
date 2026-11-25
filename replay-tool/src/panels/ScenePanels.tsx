@@ -2,10 +2,14 @@
  * 3D panels: PointCloud2 (colour by any field, point size, NaN %), TF tree,
  * Marker/MarkerArray and Pose messages.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import type { Colormap } from "../core/image";
-import { parsePointCloud, type RosPointCloud2 } from "../core/pointcloud";
+import { colormap, type Colormap } from "../core/image";
+import { cloudRgb, parsePointCloud, type RosPointCloud2 } from "../core/pointcloud";
+import { bevPixel, bevView, isOpticalFrame, ringStep, type BevView } from "../core/bev";
+import { niceCeil } from "../core/infer";
+import { effectiveCloudColour } from "../state/actions";
+import { app, useApp } from "../state/store";
 import type { TopicData } from "../core/types";
 import type { PanelConfig } from "../state/store";
 import { fmt } from "../ui/primitives";
@@ -14,56 +18,145 @@ import { axesAt, clearGroup, makePoints, useScene3D, type SceneApi } from "./Sce
 import { useDecoded, usePanelIndex } from "./useMessage";
 import { tr } from "../i18n";
 
+/** Stable BEV range of a cloud topic: median over messages of the max point distance, rounded up. */
+function cloudRangeM(t: TopicData): number {
+  const v = Array.from(t.content?.max ?? []).filter(Number.isFinite).sort((x, y) => x - y);
+  return niceCeil(v.length ? v[Math.floor(v.length / 2)] : 10) || 10;
+}
+
+/** Draws the bird's-eye view; returns the view used (for tests and the legend). */
+export function drawBev(canvas: HTMLCanvasElement, pc: RosPointCloud2, opts: { rangeM: number; colour: string; size: number }): BevView {
+  const parent = canvas.parentElement!;
+  const W = parent.clientWidth, H = parent.clientHeight;
+  const dpr = devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${H}px`;
+  const ctx = canvas.getContext("2d")!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const css = getComputedStyle(document.documentElement);
+  ctx.fillStyle = css.getPropertyValue("--surface-2") || "#111";
+  ctx.fillRect(0, 0, W, H);
+  const v = bevView(W, H, opts.rangeM, isOpticalFrame(pc.header?.frame_id));
+  // distance rings + axes
+  ctx.strokeStyle = css.getPropertyValue("--border") || "#444";
+  ctx.fillStyle = css.getPropertyValue("--text-muted") || "#999";
+  ctx.font = "10px JetBrains Mono, monospace";
+  ctx.lineWidth = 1;
+  for (let r = v.ringStepM; r <= v.rangeM + 1e-9; r += v.ringStepM) {
+    ctx.beginPath();
+    ctx.arc(v.cx, v.cy, r * v.scale, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fillText(`${+r.toFixed(2)} m`, v.cx + 3, v.cy - r * v.scale - 2);
+  }
+  ctx.beginPath();
+  ctx.moveTo(v.cx, v.cy);
+  ctx.lineTo(v.cx, v.cy - v.rangeM * v.scale);
+  ctx.moveTo(v.cx - v.rangeM * v.scale, v.cy);
+  ctx.lineTo(v.cx + v.rangeM * v.scale, v.cy);
+  ctx.stroke();
+  ctx.fillText(v.optical ? "z ↑  x →" : "x ↑  y ←", 6, 12);
+  const parsed = parsePointCloud(pc);
+  const rgb = opts.colour !== "distance" && /^rgba?$/i.test(opts.colour) ? cloudRgb(pc, opts.colour) : undefined;
+  const field = !rgb && opts.colour !== "distance" ? parsed.fields[opts.colour] : undefined;
+  let fmin = Infinity, fmax = -Infinity;
+  if (field) for (let i = 0; i < parsed.count; i++) if (Number.isFinite(field[i])) (fmin = Math.min(fmin, field[i])), (fmax = Math.max(fmax, field[i]));
+  const p = parsed.positions;
+  const sz = Math.max(1, opts.size);
+  for (let i = 0; i < parsed.count; i++) {
+    const [u, w] = bevPixel(v, p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
+    if (!Number.isFinite(u) || u < 0 || w < 0 || u > W || w > H) continue;
+    let r: number, g: number, b: number;
+    if (rgb) [r, g, b] = [rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]];
+    else if (field) [r, g, b] = colormap("turbo", (field[i] - fmin) / (fmax - fmin || 1));
+    else [r, g, b] = colormap("turbo", Math.hypot(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]) / v.rangeM);
+    ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+    ctx.fillRect(u - sz / 2, w - sz / 2, sz, sz);
+  }
+  return v;
+}
+
 export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }) {
   const { index } = usePanelIndex(topic);
   const { msg } = useDecoded(topic.topic, index);
   const api = useRef<SceneApi>();
   const fitted = useRef(false);
-  const [field, setField] = useState("x");
+  const [mode, setMode] = useState<"bev" | "3d">((cfg.options?.view as "bev" | "3d") ?? "bev");
+  const colour = useApp((s) => effectiveCloudColour(topic, s));
   const [size, setSize] = useState(0.05);
   const [cmap] = useState<Colormap>("turbo");
   const [info, setInfo] = useState({ n: 0, nan: 0, fields: [] as string[] });
   const ref = useScene3D((a) => (api.current = a));
+  const bev = useRef<HTMLCanvasElement>(null);
+  const rangeM = useMemo(() => cloudRangeM(topic), [topic]);
 
   useEffect(() => {
-    const a = api.current;
-    if (!a) return;
-    clearGroup(a.group);
-    if (!msg?.msg) return a.render();
+    if (!msg?.msg) return;
     try {
       const parsed = parsePointCloud(msg.msg as RosPointCloud2);
       let nan = 0;
       for (let i = 0; i < parsed.count; i++) if (!Number.isFinite(parsed.positions[i * 3])) nan++;
-      const scalar = field === "distance" ? Float32Array.from({ length: parsed.count }, (_, i) => Math.hypot(parsed.positions[i * 3], parsed.positions[i * 3 + 1], parsed.positions[i * 3 + 2])) : parsed.fields[field];
+      setInfo({ n: parsed.count, nan, fields: parsed.fieldNames });
+    } catch {
+      setInfo({ n: 0, nan: 0, fields: [] });
+    }
+  }, [msg]);
+
+  useEffect(() => {
+    if (mode !== "bev" || !bev.current) return;
+    const c = bev.current;
+    const draw = () => {
+      if (msg?.msg) drawBev(c, msg.msg as RosPointCloud2, { rangeM, colour, size: 2 });
+      else c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
+    };
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(c.parentElement!);
+    return () => ro.disconnect();
+  }, [msg, mode, rangeM, colour, size]);
+
+  useEffect(() => {
+    const a = api.current;
+    if (!a || mode !== "3d") return;
+    clearGroup(a.group);
+    if (!msg?.msg) return a.render();
+    try {
+      const parsed = parsePointCloud(msg.msg as RosPointCloud2);
+      const scalar = colour === "distance" || /^rgba?$/i.test(colour) ? Float32Array.from({ length: parsed.count }, (_, i) => Math.hypot(parsed.positions[i * 3], parsed.positions[i * 3 + 1], parsed.positions[i * 3 + 2])) : parsed.fields[colour];
       const { points } = makePoints(parsed.positions, scalar, size, cmap);
       a.group.add(points);
-      setInfo({ n: parsed.count, nan, fields: parsed.fieldNames });
       if (!fitted.current && parsed.count) {
         fitted.current = true;
         a.fit(8);
       }
     } catch {
-      setInfo({ n: 0, nan: 0, fields: [] });
+      /* reported in the footer */
     }
     a.render();
-  }, [msg, field, size, cmap]);
+  }, [msg, colour, size, cmap, mode]);
 
   return (
     <PanelFrame
       cfg={cfg}
       topic={topic}
       index={index}
+      shown={msg ? msg.index : -1}
       error={msg?.error}
       toolbar={
         <>
-          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11 }} aria-label={tr("Colorare după câmp")} value={field} onChange={(e) => setField(e.target.value)}>
-            {[...info.fields, "distance"].map((f) => (
+          <div className="btn-group">
+            <button className="btn sm" aria-pressed={mode === "bev"} onClick={() => setMode("bev")} data-tip="Bird's-eye view (x right, optical axis up), distance rings">BEV</button>
+            <button className="btn sm" aria-pressed={mode === "3d"} onClick={() => setMode("3d")} data-tip="Interactive 3D view">3D</button>
+          </div>
+          <select className="input" style={{ minHeight: 26, padding: "0 4px", fontSize: 11, maxWidth: 92 }} aria-label={tr("Colorare după câmp")} value={colour} onChange={(e) => app.set((st) => ({ cloudColourOverrides: { ...st.cloudColourOverrides, [topic.topic]: e.target.value } }))}>
+            {["distance", ...info.fields.filter((f) => f !== "distance")].map((f) => (
               <option key={f} value={f}>
-                colour: {f}
+                {f}
               </option>
             ))}
           </select>
-          <input type="range" min={0.01} max={0.3} step={0.01} value={size} onChange={(e) => setSize(+e.target.value)} aria-label={tr("Dimensiunea punctelor")} data-tip={tr("Dimensiunea punctelor")} style={{ width: 60 }} />
+          {mode === "3d" && <input type="range" min={0.01} max={0.3} step={0.01} value={size} onChange={(e) => setSize(+e.target.value)} aria-label={tr("Dimensiunea punctelor")} data-tip={tr("Dimensiunea punctelor")} style={{ width: 60 }} />}
         </>
       }
       footer={
@@ -71,10 +164,16 @@ export function CloudPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData 
           <span>{info.n} points</span>
           <span style={{ color: info.nan / Math.max(1, info.n) > 0.3 ? "var(--warn)" : undefined }}>NaN/invalid {fmt.pct(info.nan / Math.max(1, info.n))}</span>
           <span>frame {(msg?.msg as RosPointCloud2 | undefined)?.header?.frame_id ?? "—"}</span>
+          {mode === "bev" && <span>range {rangeM} m · rings {ringStep(rangeM)} m</span>}
         </>
       }
     >
-      <div ref={ref} style={{ position: "absolute", inset: 0 }} />
+      <div ref={ref} style={{ position: "absolute", inset: 0, visibility: mode === "3d" ? "visible" : "hidden" }} />
+      {mode === "bev" && (
+        <div style={{ position: "absolute", inset: 0 }}>
+          <canvas ref={bev} role="img" aria-label={`Bird's-eye view ${topic.topic}`} data-testid="bev" data-range={rangeM} />
+        </div>
+      )}
       {index < 0 && <div className="panel-empty">{tr("Niciun mesaj până la acest moment")}</div>}
     </PanelFrame>
   );
@@ -124,7 +223,7 @@ export function TfPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }) 
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{tfs.length} transforms</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{tfs.length} transforms</span>}>
       <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
         <div ref={ref} style={{ position: "relative" }} />
         <div className="panel-body scroll" tabIndex={0} style={{ padding: 8, fontSize: 11 }}>
@@ -204,7 +303,7 @@ export function MarkerPanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData
   }, [msg]);
 
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={<span>{markers.length} markers</span>}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={<span>{markers.length} markers</span>}>
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
     </PanelFrame>
   );
@@ -225,7 +324,7 @@ export function PosePanel({ cfg, topic }: { cfg: PanelConfig; topic: TopicData }
     a.render();
   }, [msg]);
   return (
-    <PanelFrame cfg={cfg} topic={topic} index={index} error={msg?.error} footer={pose?.position ? <span>p=({pose.position.x.toFixed(2)}, {pose.position.y.toFixed(2)}, {pose.position.z.toFixed(2)}) m</span> : null}>
+    <PanelFrame cfg={cfg} topic={topic} index={index} shown={msg ? msg.index : -1} error={msg?.error} footer={pose?.position ? <span>p=({pose.position.x.toFixed(2)}, {pose.position.y.toFixed(2)}, {pose.position.z.toFixed(2)}) m</span> : null}>
       <div ref={ref} style={{ position: "absolute", inset: 0 }} />
     </PanelFrame>
   );

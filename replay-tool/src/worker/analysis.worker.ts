@@ -4,9 +4,9 @@
  * individual decoded messages on demand (LRU cache + prefetch of the next frames),
  * and numeric field series for the generic plot panel. The UI thread never decodes.
  */
-import { analyzeRecording, type OpenedRecording } from "../core/analyze";
+import { analyzeRecording, iterateAll, readBlock, type OpenedRecording, type PartRef } from "../core/analyze";
 import { makeDecoder, shortType, type Decoder } from "../core/decode";
-import { imageToRgba, type RosImage } from "../core/image";
+import { classMapClasses, imageToRgba, type RosImage } from "../core/image";
 import { BlobReadable } from "../core/readable";
 import type { Analysis } from "../core/types";
 import type { DecodedMessage, RenderOptions, Request, Response } from "./protocol";
@@ -54,6 +54,68 @@ function topicData(topic: string) {
   return t;
 }
 
+/**
+ * Raw-message cache. McapIndexedReader decompresses a whole chunk for every
+ * readMessages() call, so serving each panel (and each prefetch) separately would
+ * decompress the same chunk many times. Instead, the first request for a moment loads
+ * every message of the chunk(s) covering it, for all channels, into this map:
+ * key "channelId:logTime" → messages with that log time (in file order).
+ * Overwriting a key with a freshly loaded range is always complete, because a key lies
+ * entirely inside any time range that contains its log time.
+ */
+const rawByKey = new Map<string, Uint8Array[]>();
+const loadedRanges: Array<{ keys: string[]; bytes: number }> = [];
+const inflightRanges = new Map<string, Promise<void>>();
+let rawBytes = 0;
+const RAW_BUDGET = 300 << 20;
+
+/** The parts of the opened recording (a single file is one part with identity channel ids). */
+function partsOf(rec: OpenedRecording): PartRef[] {
+  return rec.parts ?? [{ name: "", rec, chan: new Map([...rec.channels.keys()].map((id) => [id, id])) }];
+}
+
+async function loadRangeAround(part: PartRef, abs: bigint): Promise<void> {
+  const reader = part.rec.reader!;
+  const cis = reader.chunkIndexes.filter((c) => c.messageStartTime <= abs && abs <= c.messageEndTime);
+  if (!cis.length) return;
+  let lo = cis[0].messageStartTime, hi = cis[0].messageEndTime;
+  for (const c of cis) {
+    if (c.messageStartTime < lo) lo = c.messageStartTime;
+    if (c.messageEndTime > hi) hi = c.messageEndTime;
+  }
+  const rk = `${part.name}|${lo}-${hi}`;
+  const pending = inflightRanges.get(rk);
+  if (pending) return pending;
+  const job = (async () => {
+    const fresh = new Map<string, Uint8Array[]>();
+    let bytes = 0;
+    for await (const m of reader.readMessages({ startTime: lo, endTime: hi })) {
+      const id = part.chan.get(m.channelId);
+      if (id === undefined) continue;
+      const key = `${id}:${m.logTime}`;
+      const arr = fresh.get(key);
+      if (arr) arr.push(m.data);
+      else fresh.set(key, [m.data]);
+      bytes += m.data.length;
+    }
+    for (const [k, v] of fresh) rawByKey.set(k, v);
+    loadedRanges.push({ keys: [...fresh.keys()], bytes });
+    rawBytes += bytes;
+    while (rawBytes > RAW_BUDGET && loadedRanges.length > 1) {
+      const old = loadedRanges.shift()!;
+      for (const k of old.keys) rawByKey.delete(k);
+      rawBytes -= old.bytes;
+    }
+  })();
+  inflightRanges.set(rk, job);
+  try {
+    await job;
+  } finally {
+    inflightRanges.delete(rk);
+  }
+}
+
+
 /** Reads the raw bytes of message #index of a topic. */
 async function readRaw(topic: string, index: number): Promise<Uint8Array | undefined> {
   if (!opened || !analysis) return undefined;
@@ -63,18 +125,54 @@ async function readRaw(topic: string, index: number): Promise<Uint8Array | undef
   // several messages can share one log time: take the right occurrence
   let occurrence = 0;
   for (let j = index - 1; j >= 0 && t.log[j] === rel; j--) occurrence++;
-  if (opened.indexed && opened.reader) {
-    let k = 0;
-    for await (const m of opened.reader.readMessages({ topics: [topic], startTime: abs, endTime: abs })) {
-      if (k++ === occurrence) return m.data;
+  const key = `${t.channelId}:${abs}`;
+  let hit = rawByKey.get(key);
+  if (hit && hit.length > occurrence) return hit[occurrence];
+  const parts = partsOf(opened).filter((p) => [...p.chan.values()].includes(t.channelId));
+  for (const p of parts) {
+    if (p.rec.indexed && p.rec.reader) await loadRangeAround(p, abs);
+    else if (p.rec.lazy) await loadLazyAround(p, abs);
+  }
+  return rawByKey.get(key)?.[occurrence];
+}
+
+/** Un-indexed / salvaged parts: decode the blocks whose time span contains `abs`. */
+async function loadLazyAround(part: PartRef, abs: bigint): Promise<void> {
+  const blocks = part.rec.lazy!.blocks.filter((b) => b.start <= abs && abs <= b.end);
+  if (!blocks.length) return;
+  const rk = `${part.name}|lazy|${blocks.map((b) => b.offset).join(",")}`;
+  const pending = inflightRanges.get(rk);
+  if (pending) return pending;
+  const job = (async () => {
+    const fresh = new Map<string, Uint8Array[]>();
+    let bytes = 0;
+    for (const b of blocks) {
+      for (const m of await readBlock(part.rec, b)) {
+        const id = part.chan.get(m.channelId);
+        if (id === undefined) continue;
+        const key = `${id}:${m.logTime}`;
+        const arr = fresh.get(key);
+        if (arr) arr.push(m.data);
+        else fresh.set(key, [m.data]);
+        bytes += m.data.length;
+      }
     }
-    return undefined;
+    // a key can span two blocks (same log time at a block border): merge, never drop
+    for (const [k, v] of fresh) rawByKey.set(k, v);
+    loadedRanges.push({ keys: [...fresh.keys()], bytes });
+    rawBytes += bytes;
+    while (rawBytes > RAW_BUDGET && loadedRanges.length > 1) {
+      const old = loadedRanges.shift()!;
+      for (const k of old.keys) rawByKey.delete(k);
+      rawBytes -= old.bytes;
+    }
+  })();
+  inflightRanges.set(rk, job);
+  try {
+    await job;
+  } finally {
+    inflightRanges.delete(rk);
   }
-  let k = 0;
-  for (const m of opened.messages ?? []) {
-    if (m.logTime === abs && opened.channels.get(m.channelId)?.topic === topic) if (k++ === occurrence) return m.data;
-  }
-  return undefined;
 }
 
 function decoderFor(topic: string) {
@@ -88,7 +186,7 @@ function decoderFor(topic: string) {
   return d!;
 }
 
-const renderKey = (r?: RenderOptions) => (r ? `${r.colormap ?? ""}:${r.range?.min ?? ""}:${r.range?.max ?? ""}` : "");
+const renderKey = (r?: RenderOptions) => (r ? `${r.colormap ?? ""}:${r.range?.min ?? ""}:${r.range?.max ?? ""}:${r.classMap ?? ""}` : "");
 
 async function getMessage(topic: string, index: number, render?: RenderOptions): Promise<DecodedMessage> {
   const key = `${topic}#${index}#${renderKey(render)}`;
@@ -106,7 +204,9 @@ async function getMessage(topic: string, index: number, render?: RenderOptions):
     const type = shortType(d.schemaName);
     if (type === "sensor_msgs/Image") {
       const img = out.msg as RosImage;
-      out.rgba = imageToRgba(img, render);
+      const classes = render?.classMap === false ? 0 : classMapClasses(img);
+      if (classes) out.classes = classes;
+      out.rgba = imageToRgba(img, { ...render, classMap: classes > 0 });
       out.width = img.width;
       out.height = img.height;
       bytes += out.rgba.length;
@@ -142,6 +242,14 @@ function pick(obj: unknown, path: string): number {
   return typeof cur === "number" ? cur : NaN;
 }
 
+/** Interactive "get" requests in flight; background work (series, prefetch) yields to them. */
+let activeGets = 0;
+const nextTask = () => new Promise<void>((r) => setTimeout(r, 0));
+async function yieldToInteractive() {
+  await nextTask(); // let queued onmessage events start
+  while (activeGets > 0) await new Promise<void>((r) => setTimeout(r, 4));
+}
+
 async function series(topic: string, path: string, maxPoints = 20000) {
   const t = topicData(topic);
   const d = decoderFor(topic);
@@ -149,18 +257,20 @@ async function series(topic: string, path: string, maxPoints = 20000) {
   const step = Math.max(1, Math.ceil(n / maxPoints));
   const outT: number[] = [];
   const outV: number[] = [];
-  if (opened?.indexed && opened.reader && step === 1) {
+  if (opened && step === 1) {
     let i = 0;
-    for await (const m of opened.reader.readMessages({ topics: [topic] })) {
+    for await (const m of iterateAll(opened, [topic])) {
       try {
         outV.push(pick(d.decoder(m.data), path));
       } catch {
         outV.push(NaN);
       }
       outT.push(t.log[i++]);
+      if (i % 64 === 0) await yieldToInteractive();
     }
   } else {
     for (let i = 0; i < n; i += step) {
+      await yieldToInteractive();
       const m = await getMessage(topic, i);
       outT.push(t.log[i]);
       outV.push(pick(m.msg, path));
@@ -175,7 +285,9 @@ async function runPrefetch() {
   if (prefetching) return;
   prefetching = true;
   while (prefetchQueue.length) {
-    const p = prefetchQueue.shift()!;
+    await yieldToInteractive();
+    const p = prefetchQueue.shift();
+    if (!p) break;
     try {
       await getMessage(p.topic, p.index, p.render);
     } catch {
@@ -192,15 +304,17 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
       case "open": {
         cache.clear();
         decoders.clear();
-        const file = req.file;
-        const readable = new BlobReadable(file);
+        rawByKey.clear();
+        loadedRanges.length = 0;
+        rawBytes = 0;
+        const files = req.files?.length ? req.files : [req.file!];
         const res = await analyzeRecording(
-          {
+          files.map((file) => ({
             name: file.name,
             size: file.size,
-            readable,
-            readSlice: async (s, e) => new Uint8Array(await file.slice(s, e).arrayBuffer()),
-          },
+            readable: new BlobReadable(file),
+            readSlice: async (s: number, e: number) => new Uint8Array(await file.slice(s, e).arrayBuffer()),
+          })),
           { ranges: req.ranges, onProgress: (phase, fraction) => post({ id: req.id, op: "progress", phase, fraction }) },
         );
         opened = res.opened;
@@ -209,7 +323,13 @@ self.onmessage = async (ev: MessageEvent<Request>) => {
         break;
       }
       case "get": {
-        const message = await getMessage(req.topic, req.index, req.render);
+        activeGets++;
+        let message;
+        try {
+          message = await getMessage(req.topic, req.index, req.render);
+        } finally {
+          activeGets--;
+        }
         const transfer: Transferable[] = [];
         let msgOut = message;
         if (message.bitmap) {

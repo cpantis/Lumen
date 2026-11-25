@@ -6,10 +6,12 @@ import type { Colormap, DepthRange } from "../core/image";
 export interface RenderOptions {
   colormap?: Colormap;
   range?: DepthRange;
+  /** false: never treat 8-bit single-channel images as class maps */
+  classMap?: boolean;
 }
 
 export type Request =
-  | { id: number; op: "open"; file: File; ranges?: PlausibleRanges }
+  | { id: number; op: "open"; file?: File; files?: File[]; ranges?: PlausibleRanges }
   | { id: number; op: "get"; topic: string; index: number; render?: RenderOptions; prefetch?: number }
   | { id: number; op: "series"; topic: string; path: string; maxPoints?: number }
   | { id: number; op: "schemas" };
@@ -27,6 +29,8 @@ export interface DecodedMessage {
   bitmap?: ImageBitmap;
   width?: number;
   height?: number;
+  /** class (label) map: number of distinct class ids; drawn with a palette, nearest-neighbour */
+  classes?: number;
   error?: string;
 }
 
