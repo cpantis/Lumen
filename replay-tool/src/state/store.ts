@@ -129,6 +129,9 @@ export interface AppState {
   stepLengthM: number;
   gapFactor: number;
   paletteOpen: boolean;
+  /** issue markers shown on the timeline (imported JSON) */
+  issueMarkers?: { name: string; issues: import("../core/issues").IssueMarker[]; warnings: string[] };
+  showIssues: boolean;
   /** imported requirement YAML of the Python test suite */
   pyRequirements?: { name: string; text: string };
   /** export dialog (video / snapshots) */
@@ -152,6 +155,7 @@ export const app = new Store<AppState>({
   depthOverrides: {},
   cloudColourOverrides: {},
   staleK: 3,
+  showIssues: true,
   panels: [],
   layout: [],
   playing: false,

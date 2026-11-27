@@ -50,4 +50,14 @@ test("a new deep link restores the time base and every override", async ({ page,
   await expect(t2.getByLabel("Colouring of /cam_down/points")).toHaveValue("z");
   await p2.getByRole("tab", { name: /Replay/ }).click();
   await expect(p2.getByRole("button", { name: "header.stamp" })).toHaveAttribute("aria-pressed", "true");
+  // time, clock and layout identical after the round trip (layout = panel id, topic, x, y, w, h)
+  const decode = (h: string) => {
+    const q = new URLSearchParams(h.replace(/^#\/?[^?]*\?/, ""));
+    return { t: q.get("t"), base: q.get("base"), p: JSON.parse(Buffer.from(q.get("p")!, "base64").toString("utf8")) };
+  };
+  await p2.waitForTimeout(500);
+  const before = decode(hash), after = decode(new URL(p2.url()).hash);
+  expect(after.t).toBe(before.t);
+  expect(after.base).toBe("header");
+  expect(after.p).toEqual(before.p);
 });

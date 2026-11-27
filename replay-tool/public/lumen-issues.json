@@ -1,0 +1,34 @@
+{
+  "source": "Issue windows of the .lumen SW Test Challenge analysis (lumen_sw_test, out/issues/evidence.json), as stated in the verification brief. Times in s from the first log time of dotLumen_CHG-TEST.mcap.",
+  "issues": [
+    {
+      "id": "ISSUE-1",
+      "title": "All 4 outputs stop at ~29.9 s; cameras continue to 33.71 s",
+      "description": "3.74 s without any output while every camera keeps publishing (log time).",
+      "start_s": 29.9,
+      "end_s": 33.714,
+      "jump_s": 33.7,
+      "clock": "log",
+      "topics": ["/farfield/Semantic", "/farfield/ColorizedPointCloud", "/nearfield/Semantic", "/nearfield/ColorizedPointCloud"]
+    },
+    {
+      "id": "ISSUE-2",
+      "title": "Farfield stall 27.4–29.5 s",
+      "description": "Farfield output gaps up to 2.07 s, one farfield Semantic 1.90 s late, while /farfield/CameraRGB has no missing frame; nearfield outputs silent 1.07–1.10 s.",
+      "start_s": 27.4,
+      "end_s": 29.5,
+      "jump_s": 28.53,
+      "clock": "log",
+      "topics": ["/farfield/Semantic", "/farfield/ColorizedPointCloud", "/farfield/CameraRGB"]
+    },
+    {
+      "id": "ISSUE-3",
+      "title": "Farfield cloud deviates from same-stamp CameraDepth",
+      "description": "Worst cloud at stamp 14.836 s (FOV consistency: cloud vs depth of the same stamp).",
+      "stamp_s": 14.836,
+      "jump_s": 14.836,
+      "clock": "header",
+      "topics": ["/farfield/ColorizedPointCloud", "/farfield/CameraDepth"]
+    }
+  ]
+}

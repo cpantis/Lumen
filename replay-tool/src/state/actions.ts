@@ -198,6 +198,7 @@ function persistFileState() {
     bugs: s.bugs,
     calibrations: s.calibrations,
     manualAssumptions: s.manualAssumptions,
+    issueMarkers: s.issueMarkers,
     panels: s.panels,
     layout: s.layout,
     speedOverride: s.speedOverride,
@@ -349,6 +350,7 @@ export async function openFile(input: File | File[]): Promise<void> {
       bugs: saved.bugs ?? [],
       calibrations: saved.calibrations ?? {},
       manualAssumptions: saved.manualAssumptions ?? [],
+      issueMarkers: saved.issueMarkers,
       speedOverride: saved.speedOverride,
       stepLengthM: saved.stepLengthM ?? 0.7,
       reports: [],
@@ -562,4 +564,26 @@ export function jumpTo(t: number, topics: string[] = []): void {
   seek(t);
   app.set({ view: "replay", highlightTopics: topics });
   setTimeout(() => app.set({ highlightTopics: [] }), 2500);
+}
+
+/** Jumps to an issue marker: its clock, its moment, its view; highlights its topics. */
+export function jumpToIssue(i: import("../core/issues").IssueMarker): void {
+  app.set({ timeSource: i.clock });
+  jumpTo(i.jumpNs, i.topics);
+  if (i.view && viewEnabled(i.view as AppState["view"])) app.set({ view: i.view as AppState["view"] });
+}
+
+/** Loads issue markers from a JSON file served with the app (or any URL). */
+export async function loadIssueFile(url: string): Promise<void> {
+  const a = app.get().analysis;
+  if (!a) return;
+  try {
+    const name = url.split("/").pop() ?? url;
+    const { parseIssues } = await import("../core/issues");
+    const r = parseIssues(await (await fetch(url)).text(), BigInt(a.startNs));
+    app.set({ issueMarkers: { name, ...r }, showIssues: true });
+    toast(`${r.issues.length} issue markers loaded from ${name}`);
+  } catch (e) {
+    toast(`Cannot load ${url}: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }

@@ -6,7 +6,7 @@ import { Camera, Contrast, Film, HelpCircle, Moon, PanelRight, Search, Settings,
 import { useEffect, useMemo, useState } from "react";
 import { parseTimeInput } from "../core/time";
 import { setLang, useT, type Lang } from "../i18n";
-import { closeFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
+import { closeFile, loadIssueFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, type ViewName } from "../state/store";
 import { downloadSnapshot } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
@@ -152,6 +152,7 @@ export function CommandPalette() {
       { group: "action", label: T.exportPng, run: downloadSnapshot },
       { group: "action", label: T.exportVideo, run: () => app.set({ exportOpen: "video" }) },
       { group: "action", label: "PNG snapshots at chosen times…", run: () => app.set({ exportOpen: "snapshots" }) },
+      { group: "action", label: "Load issue markers: .lumen challenge (lumen-issues.json)", run: () => loadIssueFile("./lumen-issues.json") },
       ...(features.issues
         ? [
             { group: "action", label: T.createBug, run: () => openBugDraft() },

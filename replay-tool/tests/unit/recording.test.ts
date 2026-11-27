@@ -125,3 +125,13 @@ describe("synthetic recording", () => {
     expect(bad.every((t) => t > 13.3 && t < 14.5)).toBe(true);
   });
 });
+
+describe("SHA-256 shown = hash of the full loaded file", () => {
+  it("equals the sha256 of every byte of the file (node:crypto)", async () => {
+    const { createHash } = await import("node:crypto");
+    const want = createHash("sha256").update(readFileSync(FILE)).digest("hex");
+    expect(a.sha256).toBe(want);
+    expect(a.files![0].sha256).toBe(want);
+    expect(a.fileSize).toBe(readFileSync(FILE).length);
+  });
+});
