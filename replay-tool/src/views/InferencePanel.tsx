@@ -128,6 +128,9 @@ function Row({ t, s, fovs, inputs, par }: { t: TopicData; s: AppState; fovs: str
               ))}
             </select>
             <Origin overridden={s.triggerOverrides[t.topic] !== undefined} onReset={() => app.set((st) => ({ triggerOverrides: omit(st.triggerOverrides, t.topic) }))} />
+            {out?.triggerSource === "inferred" && out.inference.confidence === "tie-break" && (
+              <span className="badge warn" data-testid="trigger-check" data-tip="No missing frame tells the candidate inputs apart: the choice is a tie-break. Confirm it or pick the right input.">check</span>
+            )}
           </Cell>
         ) : (
           <span className="muted">—</span>

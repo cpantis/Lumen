@@ -35,7 +35,11 @@ export function ParitySection() {
     trigger: o.trigger ?? "—",
     e2e_p50_ms: ms(o.e2e.p50),
     e2e_p95_ms: ms(o.e2e.p95),
+    n: o.e2e.n,
+    e2e_p99_ms: ms(o.e2e.p99),
     e2e_max_ms: ms(o.e2e.max),
+    proc_n: o.processing.n,
+    proc_p50_ms: ms(o.processing.p50),
     proc_p95_ms: ms(o.processing.p95),
     rate_hz: Number.isFinite(o.intervals.meanHz) ? o.intervals.meanHz.toFixed(2) : "—",
     max_interval_ms: ms(o.intervals.maxNs),
@@ -63,9 +67,13 @@ export function ParitySection() {
             <tr>
               <th>Output</th>
               <th>Trigger</th>
+              <th className="num">n</th>
               <th className="num">e2e p50 ms</th>
               <th className="num">e2e p95 ms</th>
+              <th className="num">e2e p99 ms</th>
               <th className="num">e2e max ms</th>
+              <th className="num">proc n</th>
+              <th className="num">proc p50 ms</th>
               <th className="num">proc p95 ms</th>
               <th className="num">mean rate Hz</th>
               <th className="num">max interval ms</th>
@@ -78,10 +86,15 @@ export function ParitySection() {
                 <td className="mono">{o.output}</td>
                 <td className="mono small" data-tip={o.inference.reason}>
                   {o.trigger ?? "—"} <span className={`badge ${o.triggerSource === "override" ? "warn" : "neutral"}`}>{o.triggerSource === "override" ? "override" : o.trigger ? "inferred" : "none"}</span>
+                  {o.triggerSource === "inferred" && o.inference.confidence === "tie-break" && <span className="badge warn" data-tip="Tie-break, not evidence: confirm in Inventory → Inferred settings">check</span>}
                 </td>
+                <td className="num">{o.e2e.n}</td>
                 <td className="num">{metricsRows[i].e2e_p50_ms}</td>
                 <td className="num">{metricsRows[i].e2e_p95_ms}</td>
+                <td className="num">{ms(o.e2e.p99)}</td>
                 <td className="num">{metricsRows[i].e2e_max_ms}</td>
+                <td className="num">{o.processing.n}</td>
+                <td className="num">{ms(o.processing.p50)}</td>
                 <td className="num">{metricsRows[i].proc_p95_ms}</td>
                 <td className="num">{metricsRows[i].rate_hz}</td>
                 <td className="num">

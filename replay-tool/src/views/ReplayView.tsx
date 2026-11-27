@@ -12,7 +12,8 @@ import { distanceM, fmtDistance } from "../core/motion";
 import { useT } from "../i18n";
 import { PanelFor } from "../panels/registry";
 import { panelKindLabel } from "../panels/registry";
-import { columnPanels, defaultPanels, effectiveRole, fovColor, fovList, fovRowsPanels, indexAt, loadLayout, saveLayout, savedLayouts } from "../state/actions";
+import { latencyChains } from "../core/parity";
+import { columnPanels, defaultPanels, parity, effectiveRole, fovColor, fovList, fovRowsPanels, indexAt, loadLayout, saveLayout, savedLayouts } from "../state/actions";
 import { app, uid, useApp, useClock } from "../state/store";
 import { Timeline } from "../timeline/Timeline";
 import { Transport } from "../timeline/Transport";
@@ -23,44 +24,51 @@ import { tr } from "../i18n";
 const RGL = WidthProvider(GridLayout);
 
 function LatencyStrip() {
-  const a = useApp((s) => s.analysis)!;
-  const speed = useApp((s) => s.speedOverride ?? s.analysis!.motion.speedMps);
-  const source = useApp((s) => s.timeSource);
-  const exact = a.edges.filter((e) => e.kind === "exact" && /Image|CompressedImage/.test(a.topics.find((t) => t.topic === e.input)?.type ?? ""));
-  const [sel, setSel] = useState(0);
+  const s = useApp((st) => st);
+  const a = s.analysis!;
+  const speed = s.speedOverride ?? a.motion.speedMps;
+  const source = s.timeSource;
+  const chains = useMemo(() => {
+    const par = parity(s);
+    return par ? latencyChains(a.topics, par) : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a, s.roleOverrides, s.triggerOverrides, s.fovOverrides]);
+  const [selId, setSelId] = useState<string>();
   const narrow = useNarrow();
   const [open, setOpen] = useState(!narrow);
   const cursor = useClock();
-  const e = exact[Math.min(sel, exact.length - 1)];
-  const ot = e && a.topics.find((t) => t.topic === e.output)!;
+  const ch = chains.find((c) => c.id === selId) ?? chains[0];
+  const ot = ch && a.topics.find((t) => t.topic === ch.output)!;
   const x = useMemo(() => (ot ? ot.log : new Float64Array()), [ot]);
-  const series = useMemo(() => (e ? [{ label: "latency (ms)", color: "var(--accent)", values: Array.from(e.latency, (v) => v / 1e6), points: true, width: 1 }] : []), [e]);
-  if (!e || !ot) return null;
+  const series = useMemo(() => (ch ? [{ label: `${ch.kind} latency (ms)`, color: "var(--accent)", values: Array.from(ch.values, (v) => v / 1e6), points: true, width: 1 }] : []), [ch]);
+  if (!ch || !ot) return null;
   const j = indexAt(ot, cursor, source);
-  const lat = j >= 0 ? e.latency[j] : NaN;
+  const lat = j >= 0 ? ch.values[j] : NaN;
+  const sm = ch.summary;
   return (
-    <div style={{ borderBottom: "1px solid var(--border)", padding: "4px 12px", background: "var(--surface)" }} data-tour="latency">
+    <div style={{ borderBottom: "1px solid var(--border)", padding: "4px 12px", background: "var(--surface)" }} data-tour="latency" data-testid="latency-strip">
       <div className="row small wrap">
         <button className="btn sm ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "▾" : "▸"} Live latency
         </button>
-        <select className="input" style={{ minHeight: 26 }} value={sel} onChange={(ev) => setSel(+ev.target.value)} aria-label={tr("Pereche intrare → ieșire")}>
-          {exact.map((x2, i) => (
-            <option key={i} value={i}>
-              {x2.input} → {x2.output}
+        <select className="input" style={{ minHeight: 26 }} value={ch.id} onChange={(ev) => setSelId(ev.target.value)} aria-label="Latency chain">
+          {chains.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
             </option>
           ))}
         </select>
-        <span className="num" style={{ fontSize: "var(--text-lg)", color: lat > e.latencySummary.p95 ? "var(--warn)" : "var(--text)" }} aria-live="off">
+        <span className="num" style={{ fontSize: "var(--text-lg)", color: lat > sm.p95 ? "var(--warn)" : "var(--text)" }} aria-live="off" data-tip={`Latency of the ${ch.output} message shown at the cursor (#${j + 1})`}>
           {fmt.ms(lat)}
         </span>
-        <span className="muted" data-tip={tr("Distanța parcursă de utilizator în timpul latenței, la viteza estimată")}>
-          ≈ {fmtDistance(distanceM(lat, speed))} walked
+        <span className="muted" data-tip={`Distance the user walks during this latency: latency × ${speed.toFixed(2)} m/s (${a.motion.method === "assumed" ? "assumed walking speed, no IMU estimate" : `estimated from ${a.motion.imuTopic}`})`}>
+          ≈ {fmtDistance(distanceM(lat, speed))} walked at {speed.toFixed(1)} m/s{a.motion.method === "assumed" ? " (assumed)" : ""}
         </span>
-        <span className="muted xs">
-          p50 {fmt.ms(e.latencySummary.p50)} · p95 {fmt.ms(e.latencySummary.p95)} · max {fmt.ms(e.latencySummary.max)} · latency = log_time(output) − header.stamp(input)
+        <span className="muted xs mono" data-testid="latency-stats">
+          n {sm.n} · p50 {fmt.ms(sm.p50)} · p95 {fmt.ms(sm.p95)} · p99 {fmt.ms(sm.p99)} · max {fmt.ms(sm.max)}
         </span>
       </div>
+      <div className="xs muted" data-testid="latency-definition">{ch.definition}. Percentiles: linear interpolation (numpy default).</div>
       {open && <Plot x={x} series={series} time height={90} />}
     </div>
   );
