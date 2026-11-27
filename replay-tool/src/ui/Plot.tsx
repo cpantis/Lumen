@@ -67,7 +67,7 @@ export function Plot(props: PlotProps) {
       cursor: { drag: { x: true, y: false, setScale: true } },
       scales: { x: { time: false }, y: props.yRange ? { range: props.yRange } : {} },
       axes: [
-        { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, label: props.xLabel ?? (time ? "timp (s)" : undefined), labelSize: 18, size: 36 },
+        { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, label: props.xLabel ?? (time ? "time (s)" : undefined), labelSize: 18, size: 36 },
         { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, label: props.yLabel, labelSize: 18, size: 56 },
       ],
       series: [

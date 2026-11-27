@@ -3,6 +3,7 @@
  * are meant to be pasted directly into the challenge document.
  */
 import { NS_PER_MS } from "./time";
+import { intervalStats } from "./parity";
 import type { Analysis, Role, TopicData } from "./types";
 
 export interface InventoryRow {
@@ -19,6 +20,10 @@ export interface InventoryRow {
   jitterMs: string;
   maxGapMs: string;
   gaps: number;
+  /** rates and gaps on sorted unique header.stamps ("—" without header) */
+  stampMeanHz: string;
+  stampMaxIntervalMs: string;
+  gapsStamp: number | string;
   role: Role;
   reason: string;
   fov: string;
@@ -44,6 +49,11 @@ export function inventoryRows(a: Analysis, role: (t: TopicData) => Role, fov: (t
     jitterMs: f(t.rate.jitterNs / NS_PER_MS),
     maxGapMs: f(t.rate.maxGapNs / NS_PER_MS, 1),
     gaps: t.gaps.length,
+    ...(() => {
+      if (!t.hasHeader) return { stampMeanHz: "—", stampMaxIntervalMs: "—", gapsStamp: "—" };
+      const iv = intervalStats(t.stamp);
+      return { stampMeanHz: f(iv.meanHz), stampMaxIntervalMs: f(iv.maxNs / NS_PER_MS, 1), gapsStamp: t.gapsStamp?.length ?? "—" };
+    })(),
     role: role(t),
     reason: reason(t),
     fov: fov(t) ?? "—",
@@ -57,13 +67,16 @@ const HEADERS: Array<[keyof InventoryRow, string]> = [
   ["details", "Format"],
   ["frame", "frame_id"],
   ["count", "Messages"],
-  ["meanHz", "Mean Hz"],
-  ["medianHz", "Median Hz"],
-  ["minHz", "Hz min"],
-  ["maxHz", "Hz max"],
-  ["jitterMs", "Jitter (ms)"],
-  ["maxGapMs", "Max gap (ms)"],
-  ["gaps", "Gaps"],
+  ["meanHz", "Mean Hz (log)"],
+  ["medianHz", "Median Hz (log)"],
+  ["minHz", "Hz min (log)"],
+  ["maxHz", "Hz max (log)"],
+  ["jitterMs", "Jitter (ms, log)"],
+  ["maxGapMs", "Max interval (ms, log)"],
+  ["gaps", "Gaps (log, > 1.5 x median)"],
+  ["stampMeanHz", "Mean Hz (stamp)"],
+  ["stampMaxIntervalMs", "Max interval (ms, stamp)"],
+  ["gapsStamp", "Gaps (stamp, > 1.5 x median)"],
   ["role", "Role"],
   ["fov", "FOV"],
   ["reason", "Classification evidence"],

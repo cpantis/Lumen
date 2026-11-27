@@ -7,8 +7,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TopicData } from "../core/types";
-import { effectiveFov, effectiveRole, fovList, results, seek, setPlaying, topicColor } from "../state/actions";
-import { app, clock, useApp, useClock } from "../state/store";
+import { effectiveFov, effectiveRole, fovList, jumpToIssue, results, seek, setPlaying, topicColor } from "../state/actions";
+import { app, clock, toast, useApp, useClock } from "../state/store";
+import { parseIssues } from "../core/issues";
+import { FileButton } from "../ui/primitives";
+import { Flag } from "lucide-react";
 import { fmtRelS } from "../core/time";
 import { features } from "../state/features";
 import { lastAtOrBefore } from "../core/sync";
@@ -169,8 +172,28 @@ export function Timeline() {
       }
       ctx.lineWidth = 1;
     });
+    // issue markers (imported JSON): band over every row + id in the marker row
+    if (s.showIssues) {
+      ctx.font = "600 10px JetBrains Mono, monospace";
+      for (const is of s.issueMarkers?.issues ?? []) {
+        const xa = Math.max(LABEL_W, xOf(is.startNs)), xb = Math.min(LABEL_W + plotW, Math.max(xOf(is.endNs), xOf(is.startNs) + 3));
+        if (xb < LABEL_W || xa > LABEL_W + plotW) continue;
+        ctx.fillStyle = cssVar("--accent-2");
+        ctx.globalAlpha = 0.14;
+        ctx.fillRect(xa, AXIS_H, xb - xa, height - AXIS_H);
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = cssVar("--accent-2");
+        if (is.clock === "header") ctx.setLineDash([3, 3]);
+        ctx.strokeRect(xa + 0.5, AXIS_H + 0.5, Math.max(2, xb - xa - 1), height - AXIS_H - 1);
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = cssVar("--accent-2");
+        ctx.fillText(is.id, xa + 3, AXIS_H + MARK_H - 3);
+      }
+      ctx.font = "11px JetBrains Mono, monospace";
+    }
     return off;
-  }, [rows, width, height, view, violations, reportFailures, s.bugs, s.notes, gapsByTopic, xOf, plotW, s.roleOverrides, s.fovOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, width, height, view, violations, reportFailures, s.bugs, s.notes, gapsByTopic, xOf, plotW, s.roleOverrides, s.fovOverrides, s.issueMarkers, s.showIssues]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // composite: static layer + A/B + cursor (cheap, every clock tick)
   useEffect(() => {
@@ -220,6 +243,8 @@ export function Timeline() {
       if (b) return `Bug: ${b.title}`;
       const n = s.notes.find((x) => near(x.t));
       if (n) return `${n.tag}: ${n.text}`;
+      const is = s.showIssues ? s.issueMarkers?.issues.find((x) => t >= x.startNs - 5e7 && t <= x.endNs + 5e7) : undefined;
+      if (is) return `${is.id}: ${is.title} (${fmtRelS(is.startNs)} – ${fmtRelS(is.endNs)}, ${is.clock === "header" ? "header.stamp" : "log time"})`;
       return fmtRelS(t);
     }
     const r = Math.floor((my - AXIS_H - MARK_H) / ROW_H);
@@ -297,10 +322,11 @@ export function Timeline() {
         <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {tr("intrări")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {tr("ieșiri FOV 1")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> {tr("ieșiri FOV 2")}</span>
-        <span><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gap (&gt; {s.gapFactor}× period)</span>
+        <span data-tip={`Gap: log-time interval between consecutive messages > ${s.gapFactor} × the topic's median log interval`} data-testid="gap-legend"><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gap (log interval &gt; {s.gapFactor} × median)</span>
         <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> {features.issues ? tr("mesaj gol / bug") : "empty message"}</span>
         {features.requirements && <span><i style={{ display: "inline-block", width: 14, height: 10, background: "var(--error)", opacity: 0.3 }} /> requirement violation ({s.profile === "strict" ? "Strict" : "Derived"})</span>}
         {features.requirements && <span>{tr("▲ eșec din raport importat")}</span>}
+        <IssueLegend />
         <span className="spacer" />
         <span>
           {view[0] > 0 || view[1] < a.durationNs ? `zoom ${fmtRelS(view[0], 1)}–${fmtRelS(view[1], 1)} · ` : ""}Ctrl+wheel zoom · Shift+wheel pan · double-click reset
@@ -312,6 +338,46 @@ export function Timeline() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Issue markers: import (JSON), show/hide, and one jump button per issue. */
+function IssueLegend() {
+  const s = useApp((st) => st);
+  const a = s.analysis!;
+  const im = s.issueMarkers;
+  return (
+    <span className="row" style={{ gap: 6 }} data-testid="issue-legend">
+      <FileButton
+        accept=".json"
+        className="btn sm ghost"
+        tip='Issue markers from a JSON file: {"issues":[{"id","title","description","start_s","end_s","jump_s","clock":"log|header","topics":[…]}]} — times in s from the first log time'
+        onText={(text, name) => {
+          try {
+            const r = parseIssues(text, BigInt(a.startNs));
+            app.set({ issueMarkers: { name, ...r }, showIssues: true });
+            toast(`${r.issues.length} issue markers loaded from ${name}${r.warnings.length ? ` (${r.warnings.length} skipped)` : ""}`);
+          } catch (e) {
+            toast(`Cannot read ${name}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }}
+      >
+        <Flag size={12} /> Issues…
+      </FileButton>
+      {im && (
+        <>
+          <label className="row" style={{ gap: 4 }}>
+            <input type="checkbox" checked={s.showIssues} onChange={(e) => app.set({ showIssues: e.target.checked })} aria-label="Show issue markers" /> issues
+          </label>
+          {s.showIssues &&
+            im.issues.map((i) => (
+              <button key={i.id} className="btn sm" onClick={() => jumpToIssue(i)} data-tip={`${i.title}${i.description ? ` — ${i.description}` : ""} · ${fmtRelS(i.startNs)}–${fmtRelS(i.endNs)} (${i.clock === "header" ? "header.stamp" : "log time"}) · jump to ${fmtRelS(i.jumpNs)}`} data-testid="issue-jump">
+                {i.id} ↗
+              </button>
+            ))}
+        </>
+      )}
+    </span>
   );
 }
 

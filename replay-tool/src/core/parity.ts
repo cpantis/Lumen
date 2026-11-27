@@ -150,6 +150,13 @@ export interface TriggerInference {
   trigger?: string;
   candidates: TriggerCandidate[];
   reason: string;
+  /**
+   * evidence: the choice is supported by the data (single stamp source, or missing frames
+   * that rule other candidates out / show which inputs are required);
+   * tie-break: several candidates and no missing frame to tell them apart — the "logged
+   * last" rule picked one; check it (Inventory → Inferred settings) or override it.
+   */
+  confidence: "evidence" | "tie-break" | "none";
 }
 
 /** An input is a stamp source of an output when ≥ 50 % of the output stamps exist in it and the output is logged after it. */
@@ -177,7 +184,7 @@ export function inferTrigger(out: TopicData, allInputs: TopicData[], fovOf: (t: 
   const cands: Array<TriggerCandidate & { stamps: Set<number> }> = [];
   const outStamps = new Set<number>();
   for (let j = 0; j < out.count; j++) if (Number.isFinite(out.stamp[j])) outStamps.add(out.stamp[j]);
-  if (!out.hasHeader || !outStamps.size) return { output: out.topic, candidates: [], reason: "the output has no header.stamp" };
+  if (!out.hasHeader || !outStamps.size) return { output: out.topic, candidates: [], reason: "the output has no header.stamp", confidence: "none" };
   for (const inp of inputs) {
     if (!inp.hasHeader || inp.topic === out.topic || !inp.count || NON_TRIGGER_TYPES.has(inp.type)) continue;
     const by = firstByStamp(inp);
@@ -196,7 +203,7 @@ export function inferTrigger(out: TopicData, allInputs: TopicData[], fovOf: (t: 
     if (matchRatio < MIN_MATCH || !(medianDelayNs > 0)) continue;
     cands.push({ input: inp.topic, matchRatio, medianDelayNs, medianLogOffsetNs: percentile(logOff, 50), absentSlots: 0, producedWithout: 0, qualifies: true, stamps: new Set(by.keys()) });
   }
-  if (!cands.length) return { output: out.topic, candidates: [], reason: `no input shares ≥ ${MIN_MATCH * 100}% of its header.stamps and is logged before it` };
+  if (!cands.length) return { output: out.topic, candidates: [], reason: `no input shares ≥ ${MIN_MATCH * 100}% of its header.stamps and is logged before it`, confidence: "none" };
 
   // frame slots = stamps of any candidate inside the output's active span
   let lo = Infinity, hi = -Infinity;
@@ -221,11 +228,29 @@ export function inferTrigger(out: TopicData, allInputs: TopicData[], fovOf: (t: 
   const pick = [...pool].sort((a, b) => b.medianLogOffsetNs - a.medianLogOffsetNs || b.matchRatio - a.matchRatio)[0];
   const ms = (v: number) => `${(v / 1e6).toFixed(1)} ms`;
   let reason: string;
+  let confidence: TriggerInference["confidence"] = "evidence";
+  // qualifying candidates that were never missing are "not refuted", not "proven required"
+  const unproven = q.filter((c) => c.absentSlots === 0);
   if (strip.length === 1) reason = `only stamp source (${(pick.matchRatio * 100).toFixed(0)}% of stamps copied, logged ${ms(pick.medianDelayNs)} before the output)`;
   else if (q.length === 1) reason = `the only input whose missing frames suppress the output (${strip.filter((c) => !c.qualifies).map((c) => `${c.input}: output produced in ${c.producedWithout}/${c.absentSlots} of its missing slots`).join("; ")})`;
-  else if (q.length > 1) reason = `${q.length} inputs are required (missing frames suppress the output); ${pick.input} is logged last (median ${ms(pick.medianLogOffsetNs)} after its stamp)`;
-  else reason = `no input's absence suppresses the output; picked the one logged last`;
-  return { output: out.topic, trigger: pick.input, candidates: strip, reason };
+  else if (q.length > 1 && unproven.length >= 1 && q.length - unproven.length < q.length) {
+    confidence = unproven.length === q.length ? "tie-break" : "evidence";
+    reason =
+      unproven.length === q.length
+        ? `cannot tell the inputs apart: ${q.map((c) => c.input).join(", ")} share the stamps and none has a missing frame; picked ${pick.input} because it is logged last — check it or override it`
+        : `${q.length} inputs are required (missing frames suppress the output); ${pick.input} is logged last (median ${ms(pick.medianLogOffsetNs)} after its stamp)`;
+  } else if (q.length > 1) reason = `${q.length} inputs are required (missing frames suppress the output); ${pick.input} is logged last (median ${ms(pick.medianLogOffsetNs)} after its stamp)`;
+  else {
+    reason = `no input's absence suppresses the output; picked the one logged last — check it or override it`;
+    confidence = "tie-break";
+  }
+  // The pick is only evidence-based when it is the sole stamp source, the only qualifying
+  // input, or an input whose own missing frames were seen to suppress the output.
+  if (confidence === "evidence" && strip.length > 1 && q.length > 1 && pick.absentSlots === 0) {
+    confidence = "tie-break";
+    reason += ` — but ${pick.input} itself never misses a frame, so the data does not prove the output needs it; check it or override it`;
+  }
+  return { output: out.topic, trigger: pick.input, candidates: strip, reason, confidence };
 }
 
 export interface Stall {
@@ -315,4 +340,56 @@ export function computeParity(
     if (stall && stall.missedFrames > 0 && (!longest || stall.durationNs > longest.durationNs)) longest = { ...stall, output: o.topic };
   }
   return { outputs, longestStall: longest };
+}
+
+/** One latency chain shown in the replay strip: exactly what is measured, per output message. */
+export interface LatencyChain {
+  id: string;
+  output: string;
+  trigger?: string;
+  kind: "e2e" | "processing";
+  /** "/x/CameraRGB → /x/Semantic (e2e)" */
+  label: string;
+  definition: string;
+  /** per output message (ns); NaN when not defined (processing without a same-stamp trigger frame) */
+  values: Float64Array;
+  summary: Summary;
+}
+
+/**
+ * The latency chains of every output: e2e over all n output messages, and processing over
+ * the messages that have a trigger frame with the same stamp. Named after what is measured.
+ */
+export function latencyChains(topics: TopicData[], report: ParityReport): LatencyChain[] {
+  const out: LatencyChain[] = [];
+  for (const o of report.outputs) {
+    const t = topics.find((x) => x.topic === o.output);
+    if (!t?.hasHeader) continue;
+    const trig = o.trigger ? topics.find((x) => x.topic === o.trigger) : undefined;
+    const e2e = e2eLatency(t);
+    out.push({
+      id: `${o.output}|e2e`,
+      output: o.output,
+      trigger: o.trigger,
+      kind: "e2e",
+      label: `${o.trigger ?? "(input)"} → ${o.output} (e2e)`,
+      definition: "e2e = log_time(output) − header.stamp(output), the stamp copied from the input frame; all output messages",
+      values: e2e,
+      summary: summarize(e2e),
+    });
+    if (trig) {
+      const proc = processingLatency(t, trig);
+      out.push({
+        id: `${o.output}|processing`,
+        output: o.output,
+        trigger: o.trigger,
+        kind: "processing",
+        label: `${o.trigger} → ${o.output} (processing)`,
+        definition: `processing = log_time(output) − log_time(${o.trigger} message with the same header.stamp); output messages that have one`,
+        values: proc,
+        summary: summarize(proc),
+      });
+    }
+  }
+  return out;
 }

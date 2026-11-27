@@ -9,7 +9,9 @@ import { Download, Upload } from "lucide-react";
 import { useMemo } from "react";
 import { download, toMarkdownTable } from "../core/inventory";
 import { evaluatePyRequirements, parsePyRequirements } from "../core/pyreq";
-import { jumpTo, parity } from "../state/actions";
+import { effectivePeriod, jumpTo, parity } from "../state/actions";
+import { buildVerification } from "../core/verification";
+import { TOOL_ID } from "../state/trace";
 import { app, toast, useApp } from "../state/store";
 import { FileButton, Section } from "../ui/primitives";
 
@@ -35,7 +37,11 @@ export function ParitySection() {
     trigger: o.trigger ?? "—",
     e2e_p50_ms: ms(o.e2e.p50),
     e2e_p95_ms: ms(o.e2e.p95),
+    n: o.e2e.n,
+    e2e_p99_ms: ms(o.e2e.p99),
     e2e_max_ms: ms(o.e2e.max),
+    proc_n: o.processing.n,
+    proc_p50_ms: ms(o.processing.p50),
     proc_p95_ms: ms(o.processing.p95),
     rate_hz: Number.isFinite(o.intervals.meanHz) ? o.intervals.meanHz.toFixed(2) : "—",
     max_interval_ms: ms(o.intervals.maxNs),
@@ -51,6 +57,13 @@ export function ParitySection() {
           <button className="btn sm" onClick={() => download(`python-metrics-${a.fileName}.md`, `${toMarkdownTable(metricsRows, Object.keys(metricsRows[0] ?? {}).map((k) => [k, k] as [string, string]))}\n\n${a.fileName} · SHA-256 ${a.sha256}\n`, "text/markdown")}>
             <Download size={14} /> Markdown
           </button>
+          <button
+            className="btn sm"
+            data-tip="Every quantity StampTrace computes (counts, rates on both clocks, gaps, latencies per chain, match ratios, stalls) for scripts/crosscheck.py"
+            onClick={() => download(`verification-${a.fileName}.json`, JSON.stringify(buildVerification(a, par, TOOL_ID, (t) => effectivePeriod(t, s), s.staleK), null, 2), "application/json")}
+          >
+            <Download size={14} /> Verification JSON
+          </button>
           <FileButton accept=".yaml,.yml" onText={(text, name) => app.set({ pyRequirements: { name, text } })} tip="Import a requirement YAML file of the Python project (id, metric, statistic, operator, threshold per topic, unit)">
             <Upload size={14} /> Import requirement YAML
           </FileButton>
@@ -63,9 +76,13 @@ export function ParitySection() {
             <tr>
               <th>Output</th>
               <th>Trigger</th>
+              <th className="num">n</th>
               <th className="num">e2e p50 ms</th>
               <th className="num">e2e p95 ms</th>
+              <th className="num">e2e p99 ms</th>
               <th className="num">e2e max ms</th>
+              <th className="num">proc n</th>
+              <th className="num">proc p50 ms</th>
               <th className="num">proc p95 ms</th>
               <th className="num">mean rate Hz</th>
               <th className="num">max interval ms</th>
@@ -78,10 +95,15 @@ export function ParitySection() {
                 <td className="mono">{o.output}</td>
                 <td className="mono small" data-tip={o.inference.reason}>
                   {o.trigger ?? "—"} <span className={`badge ${o.triggerSource === "override" ? "warn" : "neutral"}`}>{o.triggerSource === "override" ? "override" : o.trigger ? "inferred" : "none"}</span>
+                  {o.triggerSource === "inferred" && o.inference.confidence === "tie-break" && <span className="badge warn" data-tip="Tie-break, not evidence: confirm in Inventory → Inferred settings">check</span>}
                 </td>
+                <td className="num">{o.e2e.n}</td>
                 <td className="num">{metricsRows[i].e2e_p50_ms}</td>
                 <td className="num">{metricsRows[i].e2e_p95_ms}</td>
+                <td className="num">{ms(o.e2e.p99)}</td>
                 <td className="num">{metricsRows[i].e2e_max_ms}</td>
+                <td className="num">{o.processing.n}</td>
+                <td className="num">{ms(o.processing.p50)}</td>
                 <td className="num">{metricsRows[i].proc_p95_ms}</td>
                 <td className="num">{metricsRows[i].rate_hz}</td>
                 <td className="num">

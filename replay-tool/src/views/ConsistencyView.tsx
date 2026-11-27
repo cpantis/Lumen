@@ -48,7 +48,7 @@ function FovGroupCard({ fov }: { fov: string }) {
   return (
     <>
       <Kv items={[["primary input", g.primaryInput], ["outputs", g.outputs.join(", ")], ["moments with every output present", fmt.pct(g.completeRatio)], ["incomplete moments", `${incomplete.length}`]]} />
-      <Plot x={g.stamps} series={series} time height={150} title={tr("Pentru fiecare moment (stamp): diferența dintre publicarea primei și ultimei ieșiri")} csvName={`${fov}_sincron`} />
+      <Plot x={g.stamps} series={series} time height={150} title={tr("Pentru fiecare moment (stamp): diferența dintre publicarea primei și ultimei ieșiri")} csvName={`${fov}_sync`} />
       {incomplete.slice(0, 20).map(([m, i]) => (
         <button key={i} className="btn sm ghost" onClick={() => jumpTo(g.stamps[i], g.outputs)}>
           {fmt.s(g.stamps[i])}: missing {g.outputs.filter((_, k) => !(m & (1 << k))).join(", ")}
@@ -157,7 +157,7 @@ function CalibrationCard({ fov }: { fov: string }) {
       )}
       {samples && (
         <>
-          <Plot x={errX} series={errS} time height={200} thresholds={th} shade={errShade} title={tr("Consistența nor ↔ adâncime în timp (click → salt)")} csvName={`${fov}_consistenta`} />
+          <Plot x={errX} series={errS} time height={200} thresholds={th} shade={errShade} title={tr("Consistența nor ↔ adâncime în timp (click → salt)")} csvName={`${fov}_consistency`} />
           <div className="row wrap">
             <StatusBadge kind={samples.every((x) => !(x.medianRelError > 0.05)) ? "pass" : "fail"} label={`${samples.filter((x) => x.medianRelError > 0.05).length} of ${samples.length} sampled frames above 5 %`} />
             {samples.filter((x) => x.medianRelError > 0.05).slice(0, 10).map((x) => (

@@ -52,16 +52,16 @@ export function nearest(times: NumArray, t: number): number {
   return t - times[i] <= times[i + 1] - t ? i : i + 1;
 }
 
+/** Stale rule: a panel is stale when its message is older than STALE_K × the topic's nominal period. */
+export const STALE_K = 3;
+
 /**
- * Staleness level of a panel given the age of its message and the topic's nominal period.
- * ok: age ≤ 1.5·period, warn: ≤ k·period, stale (red): older than k·period (k = 3 by
- * default, as in the Python replay script), none: no message yet.
+ * Staleness of a panel: "stale" when age > k × nominal period (k = 3, configurable),
+ * "ok" otherwise, "none" when no message has been shown yet. One rule, no intermediate level.
  */
-export type Staleness = "ok" | "warn" | "stale" | "none";
-export function staleness(ageNs: number, periodNs: number, k = 3): Staleness {
+export type Staleness = "ok" | "stale" | "none";
+export function staleness(ageNs: number, periodNs: number, k = STALE_K): Staleness {
   if (!Number.isFinite(ageNs) || ageNs < 0) return "none";
   if (!Number.isFinite(periodNs) || periodNs <= 0) return "ok";
-  if (ageNs > k * periodNs) return "stale";
-  if (ageNs <= Math.min(1.5, k) * periodNs) return "ok";
-  return "warn";
+  return ageNs > k * periodNs ? "stale" : "ok";
 }

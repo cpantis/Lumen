@@ -6,7 +6,7 @@ import { Camera, Contrast, Film, HelpCircle, Moon, PanelRight, Search, Settings,
 import { useEffect, useMemo, useState } from "react";
 import { parseTimeInput } from "../core/time";
 import { setLang, useT, type Lang } from "../i18n";
-import { closeFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
+import { closeFile, loadIssueFile, columnPanels, defaultPanels, fovRowsPanels, jumpTo, prefs, results, seek, setPlaying, setSpeed, step, togglePlay } from "../state/actions";
 import { app, clock, useApp, type ViewName } from "../state/store";
 import { downloadSnapshot } from "../export/snapshot";
 import { JsonTree } from "../panels/DataPanels";
@@ -152,6 +152,7 @@ export function CommandPalette() {
       { group: "action", label: T.exportPng, run: downloadSnapshot },
       { group: "action", label: T.exportVideo, run: () => app.set({ exportOpen: "video" }) },
       { group: "action", label: "PNG snapshots at chosen times…", run: () => app.set({ exportOpen: "snapshots" }) },
+      { group: "action", label: "Load issue markers: .lumen challenge (lumen-issues.json)", run: () => loadIssueFile("./lumen-issues.json") },
       ...(features.issues
         ? [
             { group: "action", label: T.createBug, run: () => openBugDraft() },
@@ -286,9 +287,11 @@ export function SettingsModal() {
             <option value="en">English</option>
           </select>
         </label>
-        <label className="field">{T.gapFactor}
-          <input className="input mono" type="number" min={1.1} step={0.1} value={gap} onChange={(e) => { app.set({ gapFactor: +e.target.value }); prefs.set({ gapFactor: +e.target.value }); }} style={{ width: 120 }} />
-        </label>
+        <div className="field small" data-testid="rules">
+          <b>Rules used everywhere</b>
+          <span>Gap: interval between consecutive messages &gt; {gap} × the topic's median interval on the same clock (timeline: log time; Inventory: log time and header.stamp).</span>
+          <span>Stale: the panel's message is older than k × the topic's nominal period (k = 3 by default, Inventory → Inferred settings).</span>
+        </div>
         <p className="xs muted">{tr("Preferințele se păstrează local în browser. Dimensiunea textului urmează setarea browserului (zoom până la 200 % suportat).")}</p>
       </div>
     </Modal>

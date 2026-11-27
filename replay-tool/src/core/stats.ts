@@ -114,8 +114,14 @@ export interface Gap {
   index: number;
 }
 
-/** Gaps = intervals larger than `k` × the median period (default k = 2). */
-export function detectGaps(times: NumArray, k = 2, medianPeriodNs?: number): Gap[] {
+/**
+ * Gap rule (inventory and timeline): an interval between consecutive messages larger than
+ * GAP_FACTOR × the topic's median interval on the same clock.
+ */
+export const GAP_FACTOR = 1.5;
+
+/** Gaps = intervals larger than `k` × the median period (default k = GAP_FACTOR = 1.5). */
+export function detectGaps(times: NumArray, k = GAP_FACTOR, medianPeriodNs?: number): Gap[] {
   const period = medianPeriodNs ?? summarize(intervals(times)).p50;
   if (!Number.isFinite(period) || period <= 0) return [];
   const out: Gap[] = [];

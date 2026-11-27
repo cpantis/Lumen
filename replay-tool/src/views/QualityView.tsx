@@ -115,10 +115,10 @@ export function QualityView() {
       {t && (
         <Section title={`${tr("Conținut în timp:")} ${t.topic}`} sub={tr("Liniile întrerupte = pragurile profilului activ; zonele hașurate roșu = încălcări. Click pe grafic → salt în replay.")}>
           <div className="grid-2">
-            <Plot x={t.log} series={s1} time height={200} thresholds={th1} shade={[...shadeFor("nan_max"), ...shadeFor("valid_min")]} yRange={[0, 1]} title={tr("Proporții per mesaj (0–1)")} csvName={`${t.topic}_continut`} />
-            <Plot x={t.log} series={s2} time height={200} thresholds={th2} shade={shadeFor("out_of_range_max")} yRange={[0, 1]} title={tr("Valori în afara intervalului plauzibil (0–1)")} csvName={`${t.topic}_plauzibil`} />
-            <Plot x={t.log} series={s3} time height={200} title={`${tr("Min / medie / max ale valorilor valide")} (${unit})`} csvName={`${t.topic}_valori`} />
-            <Plot x={t.log} series={s4} time height={200} shade={[...shadeFor("duplicate_max"), ...shadeFor("empty_max"), ...shadeFor("invalid_max")]} title={tr("Cadre înghețate, goale, invalide; număr de elemente")} csvName={`${t.topic}_integritate`} />
+            <Plot x={t.log} series={s1} time height={200} thresholds={th1} shade={[...shadeFor("nan_max"), ...shadeFor("valid_min")]} yRange={[0, 1]} title={tr("Proporții per mesaj (0–1)")} csvName={`${t.topic}_content`} />
+            <Plot x={t.log} series={s2} time height={200} thresholds={th2} shade={shadeFor("out_of_range_max")} yRange={[0, 1]} title={tr("Valori în afara intervalului plauzibil (0–1)")} csvName={`${t.topic}_plausibility`} />
+            <Plot x={t.log} series={s3} time height={200} title={`${tr("Min / medie / max ale valorilor valide")} (${unit})`} csvName={`${t.topic}_values`} />
+            <Plot x={t.log} series={s4} time height={200} shade={[...shadeFor("duplicate_max"), ...shadeFor("empty_max"), ...shadeFor("invalid_max")]} title={tr("Cadre înghețate, goale, invalide; număr de elemente")} csvName={`${t.topic}_integrity`} />
           </div>
           <p className="xs muted">
             Method: images are evaluated on a deterministic sub-grid of ≤ 50,000 pixels; point clouds on every point (Euclidean distance in m); "identical" = FNV-1a hash over ≤ 4096 sampled bytes + length. Plausible ranges: {JSON.stringify(s.thresholds?.plausible_ranges)}.

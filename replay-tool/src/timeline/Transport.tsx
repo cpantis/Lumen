@@ -49,15 +49,15 @@ export function Transport() {
         <option value="">{tr("pas: orice panou")}</option>
         {a.topics.map((t) => (
           <option key={t.topic} value={t.topic}>
-            pas: {t.topic}
+            step: {t.topic}
           </option>
         ))}
       </select>
-      <div className="btn-group" role="group" aria-label={T.timeSource} data-tip={tr("log time = momentul înregistrării; header.stamp = momentul achiziției/procesării")}>
-        <button className="btn sm" aria-pressed={s.timeSource === "log"} onClick={() => app.set({ timeSource: "log" })}>
+      <div className="btn-group" role="group" aria-label={T.timeSource} data-testid="clock-switch">
+        <button className="btn sm" aria-pressed={s.timeSource === "log"} onClick={() => app.set({ timeSource: "log" })} data-tip="Log time: a message appears when it was received and recorded — what a consumer of the topic saw, and when. Output panels lag their inputs by the latency.">
           {T.logTime}
         </button>
-        <button className="btn sm" aria-pressed={s.timeSource === "header"} onClick={() => app.set({ timeSource: "header" })}>
+        <button className="btn sm" aria-pressed={s.timeSource === "header"} onClick={() => app.set({ timeSource: "header" })} data-tip="header.stamp: a message appears at its stamp — for an output, the stamp of the input frame it was computed from. Inputs and their outputs line up on the same frame; latency disappears from the view.">
           {T.headerStamp}
         </button>
       </div>

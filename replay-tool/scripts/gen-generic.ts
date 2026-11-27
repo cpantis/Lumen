@@ -33,6 +33,10 @@ export interface GenericOptions {
   dropDepth?: number[];
   /** [first, last] frame indices where the segmentation component stalls (no output) */
   segStall?: [number, number];
+  /** [frame, extra seconds]: that segmentation message is logged later (a late output) */
+  lateSeg?: [number, number];
+  /** frame whose cloud is published twice with the same stamp (second copy 30 ms later) */
+  dupCloud?: number;
   /** split the messages into this many consecutive parts */
   parts?: number;
 }
@@ -53,6 +57,9 @@ export function topicNames(o: GenericOptions, fov: string): GenericTopics {
 const W = 32, H = 24;
 const T0 = 1_750_000_000;
 
+/** Log-time jitter of frame k (s), part of the exact timing model. */
+export const jitterS = (k: number) => ((k * 7919) % 13) * 1e-4;
+
 /** Exact timing model of the generator (used by the tests to compute expected values). */
 export const TIMING = { rgbLog: 0.008, depthLog: 0.012, segAfterRgb: 0.041, cloudAfterDepth: 0.026 };
 
@@ -71,7 +78,7 @@ export async function genGeneric(o: GenericOptions): Promise<Uint8Array[]> {
     for (let k = 0; k < frames; k++) {
       const s = 0.05 + k / hz;
       const st = stampOf(s);
-      const jit = ((k * 7919) % 13) * 1e-4;
+      const jit = jitterS(k);
       const hasRgb = !dropRgb.has(k), hasDepth = !dropDepth.has(k);
       if (hasRgb) {
         const data = new Uint8Array(W * H * 3);
@@ -94,7 +101,8 @@ export async function genGeneric(o: GenericOptions): Promise<Uint8Array[]> {
       if (hasRgb && !stalled) {
         const data = new Uint8Array(W * H);
         for (let i = 0; i < W * H; i++) data[i] = ((i >> 3) + k) % 5; // 5 classes
-        msgs.push({ topic: tn.seg, type: "sensor_msgs/msg/Image", log: s + TIMING.rgbLog + jit + TIMING.segAfterRgb, msg: { header: { stamp: st, frame_id: frame("color") }, height: H, width: W, encoding: "mono8", is_bigendian: 0, step: W, data } });
+        const late = o.lateSeg && o.lateSeg[0] === k ? o.lateSeg[1] : 0;
+        msgs.push({ topic: tn.seg, type: "sensor_msgs/msg/Image", log: s + TIMING.rgbLog + jit + TIMING.segAfterRgb + late, msg: { header: { stamp: st, frame_id: frame("color") }, height: H, width: W, encoding: "mono8", is_bigendian: 0, step: W, data } });
       }
       if (hasRgb && hasDepth) {
         const n = 64;
@@ -109,7 +117,9 @@ export async function genGeneric(o: GenericOptions): Promise<Uint8Array[]> {
           else dv.setUint32(i * step + 12, ((i * 4) << 16) | (128 << 8) | 255, true);
         }
         const fields = ["x", "y", "z", o.cloudRgb === false ? "intensity" : "rgb"].map((name, i) => ({ name, offset: i * 4, datatype: 7, count: 1 }));
-        msgs.push({ topic: tn.cloud, type: "sensor_msgs/msg/PointCloud2", log: s + TIMING.depthLog + jit + TIMING.cloudAfterDepth, msg: { header: { stamp: st, frame_id: frame("depth") }, height: 1, width: n, fields, is_bigendian: false, point_step: step, row_step: n * step, data, is_dense: true } });
+        const cloudMsg = { header: { stamp: st, frame_id: frame("depth") }, height: 1, width: n, fields, is_bigendian: false, point_step: step, row_step: n * step, data, is_dense: true };
+        msgs.push({ topic: tn.cloud, type: "sensor_msgs/msg/PointCloud2", log: s + TIMING.depthLog + jit + TIMING.cloudAfterDepth, msg: cloudMsg });
+        if (o.dupCloud === k) msgs.push({ topic: tn.cloud, type: "sensor_msgs/msg/PointCloud2", log: s + TIMING.depthLog + jit + TIMING.cloudAfterDepth + 0.03, msg: cloudMsg });
       }
     }
     if (o.tf) {
