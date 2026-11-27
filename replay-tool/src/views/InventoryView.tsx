@@ -62,8 +62,8 @@ function TopicDetail({ t }: { t: TopicData }) {
   const rate = useMemo(() => instantRate(t.log), [t]);
   const offset = useMemo(() => (t.clock ? Float64Array.from(t.log, (l, i) => (l - t.stamp[i]) / 1e6) : undefined), [t]);
   const histX = useMemo(() => hist.edges.slice(0, -1).map((e, i) => (e + hist.edges[i + 1]) / 2), [hist]);
-  const histS = useMemo(() => [{ label: "nr. intervale", color: "var(--accent-2)", values: hist.counts }], [hist]);
-  const rateS = useMemo(() => [{ label: "Hz instantaneu", color: "var(--accent)", values: rate.hz, width: 1 }], [rate]);
+  const histS = useMemo(() => [{ label: "intervals", color: "var(--accent-2)", values: hist.counts }], [hist]);
+  const rateS = useMemo(() => [{ label: "instantaneous Hz (log)", color: "var(--accent)", values: rate.hz, width: 1 }], [rate]);
   const offS = useMemo(() => (offset ? [{ label: "log − stamp (ms)", color: "var(--accent-2)", values: offset, width: 1 }] : []), [offset]);
   const ths = useMemo(() => [{ value: t.rate.medianHz, label: `median ${fmt.hz(t.rate.medianHz)}`, color: "var(--text-muted)" }], [t]);
   return (
@@ -82,8 +82,8 @@ function TopicDetail({ t }: { t: TopicData }) {
       </div>
       {t.firstError && <div className="callout error">Decoding error: {t.firstError}</div>}
       <div className="grid-2">
-        <Plot x={histX} series={histS} bars height={180} xLabel={tr("interval între mesaje (ms)")} title={tr("Histograma intervalelor")} csvName={`${t.topic}_intervale`} />
-        <Plot x={rate.t} series={rateS} time height={180} title={tr("Frecvența instantanee în timp (click → salt)")} thresholds={ths} csvName={`${t.topic}_rata`} />
+        <Plot x={histX} series={histS} bars height={180} xLabel={tr("interval între mesaje (ms)")} title={tr("Histograma intervalelor")} csvName={`${t.topic}_intervals`} />
+        <Plot x={rate.t} series={rateS} time height={180} title={tr("Frecvența instantanee în timp (click → salt)")} thresholds={ths} csvName={`${t.topic}_rate`} />
       </div>
       {t.clock && (
         <div className="grid-2">
@@ -210,7 +210,7 @@ export function InventoryView() {
           </table>
         </div>
         <p className="xs muted" style={{ marginTop: 8 }}>
-          {tr("Euristica: tipurile brute de senzor (Image, CompressedImage, Imu, CameraInfo) sunt intrări; un topic devine")} <b>{tr("ieșire")}</b> {tr("când ≥ 50 % din header.stamp-uri sunt copiate exact din alt topic și e publicat la > 2 ms după el (dovadă de procesare). Rolurile și FOV-urile se pot edita; se salvează local pentru acest fișier (după SHA-256).")}
+          Rule: raw sensor types (Image, CompressedImage, Imu, CameraInfo) are inputs; a topic is an <b>output</b> when ≥ 50 % of its header.stamps exactly match an input's and it is logged a median &gt; 2 ms after it, and it never has a frame in a slot where that input is missing. Roles and FOVs can be edited (Inferred settings below); edits are saved locally for this file (by SHA-256), in the deep link and in exports.
         </p>
       </Section>
       <InferencePanel />

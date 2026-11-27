@@ -122,10 +122,10 @@ function RequirementsDraft() {
         </table>
       </div>
       <div className="row" style={{ marginTop: 8 }}>
-        <button className="btn sm" onClick={() => download("cerinte-ciorna.md", toMarkdownTable(rows, headers) + `\n\n<sub>${traceLine()}</sub>\n`, "text/markdown")}>
+        <button className="btn sm" onClick={() => download("requirements-draft.md", toMarkdownTable(rows, headers) + `\n\n<sub>${traceLine()}</sub>\n`, "text/markdown")}>
           <Download size={14} /> Markdown
         </button>
-        <button className="btn sm" onClick={() => download("thresholds-propus.yaml", dumpThresholds(proposed), "text/yaml")}>
+        <button className="btn sm" onClick={() => download("thresholds-proposed.yaml", dumpThresholds(proposed), "text/yaml")}>
           <Download size={14} /> YAML
         </button>
         {features.requirements && (
@@ -171,8 +171,8 @@ export function CausalityView() {
         sub={tr("Săgeata înseamnă: ≥ 50 % din stamp-urile ieșirii sunt copiate exact din intrare, iar ieșirea e publicată după ea. Procentul = rata de potrivire; p50 = latența mediană.")}
         actions={
           <div className="row">
-            <button className="btn sm" onClick={() => download("diagrama-io.mmd", mermaidDiagram(a, (t) => effectiveRole(t, s), (t) => effectiveFov(t, s)), "text/plain")}><Download size={14} /> Mermaid</button>
-            <button className="btn sm" onClick={() => { const svg = document.querySelector(".diagram")?.outerHTML; if (svg) download("diagrama-io.svg", svg, "image/svg+xml"); }}><Download size={14} /> SVG</button>
+            <button className="btn sm" onClick={() => download("io-diagram.mmd", mermaidDiagram(a, (t) => effectiveRole(t, s), (t) => effectiveFov(t, s)), "text/plain")}><Download size={14} /> Mermaid</button>
+            <button className="btn sm" onClick={() => { const svg = document.querySelector(".diagram")?.outerHTML; if (svg) download("io-diagram.svg", svg, "image/svg+xml"); }}><Download size={14} /> SVG</button>
           </div>
         }
       >
@@ -213,8 +213,8 @@ export function CausalityView() {
               <b>{tr("Definiția latenței afișate:")}</b> {tr("latență =")} <code>log_time(output) − header.stamp(exactly matched input)</code> {tr("— timpul de la achiziția cadrului până la publicarea rezultatului (cap-coadă). A doua curbă,")} <code>log_time(output) − log_time(input)</code>, excludes the input's transport. Measured on {e.matched} matched outputs out of {e.outputs}.
             </div>
             <div className="grid-2">
-              <Plot x={hx} series={hs} bars height={200} xLabel={tr("latență (ms)")} title={tr("Distribuția latenței")} csvName="latenta_hist" />
-              <Plot x={out.log} series={ts} time height={200} thresholds={th} title={tr("Latența în timp (click → salt)")} csvName="latenta_timp" />
+              <Plot x={hx} series={hs} bars height={200} xLabel={tr("latență (ms)")} title={tr("Distribuția latenței")} csvName="latency_histogram" />
+              <Plot x={out.log} series={ts} time height={200} thresholds={th} title={tr("Latența în timp (click → salt)")} csvName="latency_over_time" />
             </div>
             <h4 style={{ marginTop: 16 }}>Runs of input frames without output ({e.droppedInputs.length} frames, {e.dropRuns.length} runs)</h4>
             <div className="row wrap">
