@@ -31,7 +31,10 @@ async function romanian(page: Page): Promise<string[]> {
   }, [RO_WORDS.source, DIACRITICS.source]);
 }
 
-test("no Romanian text anywhere in the English UI", async ({ page }) => {
+test("no Romanian text anywhere in the English UI, and no console error in any view", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.evaluate(() => localStorage.setItem("lumen.prefs", JSON.stringify({ tourDone: true })));
   await page.reload();
@@ -57,4 +60,5 @@ test("no Romanian text anywhere in the English UI", async ({ page }) => {
   }
   console.log(found.join("\n"));
   expect(found).toEqual([]);
+  expect(errors).toEqual([]);
 });

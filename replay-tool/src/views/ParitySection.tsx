@@ -9,7 +9,9 @@ import { Download, Upload } from "lucide-react";
 import { useMemo } from "react";
 import { download, toMarkdownTable } from "../core/inventory";
 import { evaluatePyRequirements, parsePyRequirements } from "../core/pyreq";
-import { jumpTo, parity } from "../state/actions";
+import { effectivePeriod, jumpTo, parity } from "../state/actions";
+import { buildVerification } from "../core/verification";
+import { TOOL_ID } from "../state/trace";
 import { app, toast, useApp } from "../state/store";
 import { FileButton, Section } from "../ui/primitives";
 
@@ -54,6 +56,13 @@ export function ParitySection() {
         <div className="row wrap">
           <button className="btn sm" onClick={() => download(`python-metrics-${a.fileName}.md`, `${toMarkdownTable(metricsRows, Object.keys(metricsRows[0] ?? {}).map((k) => [k, k] as [string, string]))}\n\n${a.fileName} · SHA-256 ${a.sha256}\n`, "text/markdown")}>
             <Download size={14} /> Markdown
+          </button>
+          <button
+            className="btn sm"
+            data-tip="Every quantity StampTrace computes (counts, rates on both clocks, gaps, latencies per chain, match ratios, stalls) for scripts/crosscheck.py"
+            onClick={() => download(`verification-${a.fileName}.json`, JSON.stringify(buildVerification(a, par, TOOL_ID, (t) => effectivePeriod(t, s), s.staleK), null, 2), "application/json")}
+          >
+            <Download size={14} /> Verification JSON
           </button>
           <FileButton accept=".yaml,.yml" onText={(text, name) => app.set({ pyRequirements: { name, text } })} tip="Import a requirement YAML file of the Python project (id, metric, statistic, operator, threshold per topic, unit)">
             <Upload size={14} /> Import requirement YAML

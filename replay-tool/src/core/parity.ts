@@ -244,6 +244,12 @@ export function inferTrigger(out: TopicData, allInputs: TopicData[], fovOf: (t: 
     reason = `no input's absence suppresses the output; picked the one logged last — check it or override it`;
     confidence = "tie-break";
   }
+  // The pick is only evidence-based when it is the sole stamp source, the only qualifying
+  // input, or an input whose own missing frames were seen to suppress the output.
+  if (confidence === "evidence" && strip.length > 1 && q.length > 1 && pick.absentSlots === 0) {
+    confidence = "tie-break";
+    reason += ` — but ${pick.input} itself never misses a frame, so the data does not prove the output needs it; check it or override it`;
+  }
   return { output: out.topic, trigger: pick.input, candidates: strip, reason, confidence };
 }
 
