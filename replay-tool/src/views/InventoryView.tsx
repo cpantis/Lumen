@@ -166,11 +166,14 @@ export function InventoryView() {
                 <th>{tr("Topic")}</th>
                 <th>{tr("Tip")}</th>
                 <th className="num">{tr("Mesaje")}</th>
-                <th className="num">{tr("Hz medie")}</th>
-                <th className="num">{tr("Hz min–max")}</th>
-                <th className="num">{tr("Jitter ms")}</th>
-                <th className="num">{tr("Gol max ms")}</th>
-                <th className="num">{tr("Goluri")}</th>
+                <th className="num" data-tip="(n − 1) / (last − first log time)">Mean Hz (log)</th>
+                <th className="num" data-tip="1 / max and 1 / min log interval">Hz min–max (log)</th>
+                <th className="num" data-tip="Standard deviation of the log intervals">Jitter ms (log)</th>
+                <th className="num" data-tip="Largest interval between consecutive log times">Max interval ms (log)</th>
+                <th className="num" data-tip="Log intervals > 1.5 × the median log interval">Gaps (log)</th>
+                <th className="num" data-tip="(n − 1) / (last − first) over the sorted unique header.stamps">Mean Hz (stamp)</th>
+                <th className="num" data-tip="Largest interval between sorted unique header.stamps">Max interval ms (stamp)</th>
+                <th className="num" data-tip="Stamp intervals > 1.5 × the median stamp interval">Gaps (stamp)</th>
                 <th>{tr("Rol")}</th>
                 <th>FOV</th>
                 <th>{tr("Motivul clasificării")}</th>
@@ -187,6 +190,9 @@ export function InventoryView() {
                   <td className="num">{r.jitterMs}</td>
                   <td className="num">{r.maxGapMs}</td>
                   <td className="num">{r.gaps}</td>
+                  <td className="num">{r.stampMeanHz}</td>
+                  <td className="num">{r.stampMaxIntervalMs}</td>
+                  <td className="num">{r.gapsStamp}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <select className="input" aria-label={`Role of ${r.topic}`} value={r.role} onChange={(e) => app.set((st) => ({ roleOverrides: { ...st.roleOverrides, [r.topic]: e.target.value as Role } }))}>
                       <option value="input">{tr("Intrare")}</option>

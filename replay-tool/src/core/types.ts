@@ -51,7 +51,10 @@ export interface TopicData {
   details: Record<string, string>;
   content: ContentArrays;
   rate: RateStats;
+  /** gaps on log time: interval > GAP_FACTOR (1.5) × median log interval */
   gaps: Gap[];
+  /** gaps on sorted unique header.stamps: interval > 1.5 × median stamp interval */
+  gapsStamp?: Gap[];
   clock?: ClockStats;
   /** automatic classification + human-readable evidence */
   autoRole: Role;

@@ -2,7 +2,6 @@
 import { Fragment, lazy, Suspense, useEffect } from "react";
 import { useLang } from "./i18n";
 import { viewEnabled } from "./state/features";
-import { prefs } from "./state/actions";
 import { app, useApp } from "./state/store";
 import { BugEditor } from "./views/bugs";
 import { ErrorScreen, LoadingScreen, StartScreen } from "./views/StartScreen";
@@ -71,8 +70,6 @@ export function App() {
   const lang = useLang(); // keyed fragment below: re-render every tr() text on language change
   useShortcuts();
   useEffect(() => {
-    const g = prefs.get().gapFactor;
-    if (g) app.set({ gapFactor: g });
     if (location.hash.startsWith("#/styleguide")) app.set({ view: "styleguide" });
   }, []);
 

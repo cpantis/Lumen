@@ -297,7 +297,7 @@ export function Timeline() {
         <span><i className="chip-dot" style={{ background: "var(--role-input)" }} /> {tr("intrări")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov1)" }} /> {tr("ieșiri FOV 1")}</span>
         <span><i className="chip-dot" style={{ background: "var(--role-fov2)" }} /> {tr("ieșiri FOV 2")}</span>
-        <span><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gap (&gt; {s.gapFactor}× period)</span>
+        <span data-tip={`Gap: log-time interval between consecutive messages > ${s.gapFactor} × the topic's median log interval`} data-testid="gap-legend"><i style={{ display: "inline-block", width: 14, height: 2, background: "var(--error)" }} /> gap (log interval &gt; {s.gapFactor} × median)</span>
         <span><i className="chip-dot" style={{ background: "var(--warn)", borderRadius: 2 }} /> {features.issues ? tr("mesaj gol / bug") : "empty message"}</span>
         {features.requirements && <span><i style={{ display: "inline-block", width: 14, height: 10, background: "var(--error)", opacity: 0.3 }} /> requirement violation ({s.profile === "strict" ? "Strict" : "Derived"})</span>}
         {features.requirements && <span>{tr("▲ eșec din raport importat")}</span>}

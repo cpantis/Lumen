@@ -16,7 +16,8 @@ import { contentMetrics, DEFAULT_RANGES, type PlausibleRanges } from "./content"
 import { decompressHandlers, makeDecoder, rootDefinition, shortType, type ChannelInfo, type Decoder, type SchemaInfo } from "./decode";
 import { estimateMotion } from "./motion";
 import { sha256OfParts } from "./sha256";
-import { detectGaps, rateStats, summarize } from "./stats";
+import { detectGaps, GAP_FACTOR, rateStats, summarize } from "./stats";
+import { sortedUnique } from "./parity";
 import { rosTimeToNs } from "./time";
 import type { Analysis, ClockStats, ContentArrays, TopicData } from "./types";
 
@@ -713,7 +714,8 @@ async function analyzeOpened(
       details,
       content,
       rate,
-      gaps: detectGaps(log, 2, rate.medianPeriodNs),
+      gaps: detectGaps(log, GAP_FACTOR, rate.medianPeriodNs),
+      gapsStamp: header ? detectGaps(sortedUnique(stamp), GAP_FACTOR) : undefined,
       clock: header ? clockStats(log, stamp) : undefined,
       autoRole: "unknown",
       roleReason: "",

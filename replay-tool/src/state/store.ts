@@ -169,7 +169,7 @@ export const app = new Store<AppState>({
   manualAssumptions: [],
   calibrations: {},
   stepLengthM: 0.7,
-  gapFactor: 2,
+  gapFactor: 1.5,
   paletteOpen: false,
   helpOpen: false,
   settingsOpen: false,

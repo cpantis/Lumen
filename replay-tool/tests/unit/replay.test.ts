@@ -32,16 +32,21 @@ describe("time bases", () => {
 
 describe("stale flag", () => {
   const P = 100 * MS;
-  it("red (stale) only beyond k × nominal period, k = 3 by default", () => {
+  it("stale only beyond k × nominal period, k = 3 by default; no intermediate level", () => {
     expect(staleness(1.0 * P, P)).toBe("ok");
-    expect(staleness(2.5 * P, P)).toBe("warn");
-    expect(staleness(3.0 * P, P)).toBe("warn");
+    expect(staleness(2.9 * P, P)).toBe("ok");
+    expect(staleness(3.0 * P, P)).toBe("ok");
     expect(staleness(3.01 * P, P)).toBe("stale");
   });
   it("k is configurable", () => {
     expect(staleness(2.5 * P, P, 2)).toBe("stale");
-    expect(staleness(4 * P, P, 5)).toBe("warn");
+    expect(staleness(4 * P, P, 5)).toBe("ok");
     expect(staleness(1.2 * P, P, 1)).toBe("stale");
+  });
+  it("the demo check of the brief: 1.0 s old farfield output (200 ms) is stale, a 20 ms old camera frame (33.3 ms) is not", () => {
+    expect(staleness(1.0e9, 200 * MS)).toBe("stale");
+    expect(staleness(20 * MS, 33.3 * MS)).toBe("ok");
+    expect(staleness(3.7e9, 66.7 * MS)).toBe("stale");
   });
 });
 
@@ -95,5 +100,17 @@ describe("renderers", () => {
       const pc: RosPointCloud2 = { height: 1, width: 2, fields: [{ name: "x", offset: 0, datatype: 7, count: 1 }, { name: "rgb", offset: 4, datatype, count: 1 }], is_bigendian: false, point_step: 8, row_step: 16, data };
       expect(Array.from(cloudRgb(pc)!)).toEqual([255, 128, 1, 1, 2, 3]);
     }
+  });
+});
+
+describe("gap rule", () => {
+  it("a gap is an interval > 1.5 × the median interval (strictly), on the clock given", async () => {
+    const { detectGaps, GAP_FACTOR } = await import("../../src/core/stats");
+    expect(GAP_FACTOR).toBe(1.5);
+    // median interval 100 ms; 150 ms is not a gap, 151 ms is
+    const t = [0, 100, 200, 300, 450, 601, 701, 801, 901].map((v) => v * MS);
+    const g = detectGaps(t);
+    expect(g.map((x) => x.durationNs / MS)).toEqual([151]);
+    expect(g[0].startNs).toBe(450 * MS);
   });
 });

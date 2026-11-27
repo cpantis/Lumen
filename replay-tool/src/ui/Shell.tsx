@@ -286,9 +286,11 @@ export function SettingsModal() {
             <option value="en">English</option>
           </select>
         </label>
-        <label className="field">{T.gapFactor}
-          <input className="input mono" type="number" min={1.1} step={0.1} value={gap} onChange={(e) => { app.set({ gapFactor: +e.target.value }); prefs.set({ gapFactor: +e.target.value }); }} style={{ width: 120 }} />
-        </label>
+        <div className="field small" data-testid="rules">
+          <b>Rules used everywhere</b>
+          <span>Gap: interval between consecutive messages &gt; {gap} × the topic's median interval on the same clock (timeline: log time; Inventory: log time and header.stamp).</span>
+          <span>Stale: the panel's message is older than k × the topic's nominal period (k = 3 by default, Inventory → Inferred settings).</span>
+        </div>
         <p className="xs muted">{tr("Preferințele se păstrează local în browser. Dimensiunea textului urmează setarea browserului (zoom până la 200 % suportat).")}</p>
       </div>
     </Modal>

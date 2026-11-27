@@ -83,8 +83,12 @@ export function PanelFrame({
         </div>
         <div className="head-status">
           <StatusBadge kind={status} />
-          <span className="meta" data-tip={tr("Indexul mesajului afișat / total · vârsta lui față de cursor")}>
-            {topic ? `${index >= 0 ? index + 1 : "—"}/${topic.count}` : ""} {Number.isFinite(age) && index >= 0 ? `· ${fmt.ms(age, 0)}` : ""}
+          <span
+            className="meta"
+            data-testid="panel-age"
+            data-tip={topic ? `Message shown / total · age = replay time − its ${s.timeSource === "header" ? "header.stamp" : "log time"}. Stale when age > ${s.staleK} × nominal period (${fmt.ms(effectivePeriod(topic, s), 1)}) = ${fmt.ms(s.staleK * effectivePeriod(topic, s), 0)}.` : undefined}
+          >
+            {topic ? `${index >= 0 ? index + 1 : "—"}/${topic.count}` : ""} {Number.isFinite(age) && index >= 0 ? `· age ${age >= 1e9 ? `${(age / 1e9).toFixed(2)} s` : fmt.ms(age, 0)}` : ""}
           </span>
         </div>
         <div className="row" style={{ gap: 0 }} onMouseDown={(e) => e.stopPropagation()}>

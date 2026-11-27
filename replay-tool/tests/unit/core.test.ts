@@ -36,10 +36,10 @@ describe("sync — binary search", () => {
       expect(lastAtOrBefore(arr, q)).toBe(bf);
     }
   });
-  it("staleness levels", () => {
+  it("staleness: one rule, stale when age > 3 × period", () => {
     expect(staleness(10, 10)).toBe("ok");
-    expect(staleness(20, 10)).toBe("warn");
-    expect(staleness(40, 10)).toBe("stale");
+    expect(staleness(30, 10)).toBe("ok"); // exactly 3 × period is not stale
+    expect(staleness(30.001, 10)).toBe("stale");
     expect(staleness(NaN, 10)).toBe("none");
   });
 });
