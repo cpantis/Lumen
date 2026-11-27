@@ -24,25 +24,42 @@ const SENSOR_TYPES = new Set([
 ]);
 
 const IMAGE_TYPES = new Set(["sensor_msgs/Image", "sensor_msgs/CompressedImage"]);
+/** Spatial outputs computed from cameras / depth, never from an IMU's stamps. */
+const SPATIAL_TYPES = new Set(["sensor_msgs/PointCloud2", "sensor_msgs/LaserScan", "sensor_msgs/PointCloud"]);
 
 /** Raw sensor types that are acquired, never computed from another topic's frames. */
 const ACQUIRED_TYPES = new Set(["sensor_msgs/Image", "sensor_msgs/CompressedImage", "sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix"]);
 /** High-rate non-visual sensors: stamp coincidence with them proves nothing (hardware sync). */
 const NON_VISUAL = new Set(["sensor_msgs/Imu", "sensor_msgs/MagneticField", "sensor_msgs/NavSatFix", "sensor_msgs/FluidPressure", "sensor_msgs/Temperature", "tf2_msgs/TFMessage"]);
-/** An output must consume at least this fraction of its source's frames (rate ratio ≥ 1/5). */
+/**
+ * Kept for compatibility (no longer used to reject a pair): heavy components legitimately
+ * use a small fraction of their camera's frames (e.g. segmentation at 4.7 Hz on a 30 Hz
+ * camera, < 20 %). Hardware-synchronised sensors are told apart by type (non-visual
+ * sources), by the processing delay and by independence evidence instead.
+ */
 export const MAX_SOURCE_DROP = 0.8;
 
 /**
  * Plausibility of "output is computed from input", beyond identical stamps:
  * hardware-synchronised sensors share stamps (a 100 Hz IMU and a 10 Hz camera stamped on
- * the same clock), so identical stamps alone are not proof. Rejected:
- *  - sources that are high-rate non-visual sensors (IMU, GNSS, TF…) for acquired types;
- *  - pairs where the output uses < 20 % of the source's frames (rate ratio < 1/5).
+ * the same clock), so identical stamps alone are not proof. Rejected: sources that are
+ * high-rate non-visual sensors (IMU, GNSS, TF…) for acquired, image and spatial
+ * (point cloud, laser scan) outputs.
  */
-export function plausibleSource(e: CausalEdge, inputType: string, outputType: string): boolean {
-  if (e.dropRatio > MAX_SOURCE_DROP) return false;
-  if (NON_VISUAL.has(inputType) && (ACQUIRED_TYPES.has(outputType) || IMAGE_TYPES.has(outputType))) return false;
+export function plausibleSource(_e: CausalEdge, inputType: string, outputType: string): boolean {
+  if (NON_VISUAL.has(inputType) && (ACQUIRED_TYPES.has(outputType) || IMAGE_TYPES.has(outputType) || SPATIAL_TYPES.has(outputType))) return false;
   return true;
+}
+
+/** Minimum median delay for a topic to count as *processed* from another (ns). */
+export const MIN_PROCESSING_NS = 2e6;
+
+/** Number of leading namespace segments two topics share (tie-breaker for synced cameras). */
+export function nsAffinity(a: string, b: string): number {
+  const x = a.split("/").filter(Boolean), y = b.split("/").filter(Boolean);
+  let k = 0;
+  while (k < x.length && k < y.length && x[k] === y[k]) k++;
+  return k;
 }
 
 /**
@@ -65,16 +82,6 @@ export function producedWithoutSource(e: CausalEdge, topics: TopicData[]): boole
   return n >= 2 && n / Math.max(1, o.count) >= 0.01;
 }
 
-/** Minimum median delay for a topic to count as *processed* from another (ns). */
-export const MIN_PROCESSING_NS = 2e6;
-
-/** Number of leading namespace segments two topics share (tie-breaker for synced cameras). */
-export function nsAffinity(a: string, b: string): number {
-  const x = a.split("/").filter(Boolean), y = b.split("/").filter(Boolean);
-  let k = 0;
-  while (k < x.length && k < y.length && x[k] === y[k]) k++;
-  return k;
-}
 
 /** Exact-stamp matching between two topics. */
 export function matchTopics(input: TopicData, output: TopicData): CausalEdge | undefined {

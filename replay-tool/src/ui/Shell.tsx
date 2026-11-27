@@ -182,6 +182,9 @@ export function CommandPalette() {
   };
   const filtered = useMemo(() => filterFor(q), [cmds, q, s.analysis]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setSel(0), [q]);
+  // The pointer can rest over the long, unfiltered list: a late hover event then sets an
+  // index past the end of the filtered one. Always use an index inside the current list.
+  const cur = Math.max(0, Math.min(sel, filtered.length - 1));
   if (!open) return null;
   const close = () => {
     app.set({ paletteOpen: false });
@@ -199,15 +202,15 @@ export function CommandPalette() {
           role="combobox"
           aria-expanded="true"
           aria-controls="palette-list"
-          aria-activedescendant={`cmd-${sel}`}
+          aria-activedescendant={`cmd-${cur}`}
           onKeyDown={(e) => {
             if (e.key === "Escape") close();
-            if (e.key === "ArrowDown") (e.preventDefault(), setSel(Math.min(filtered.length - 1, sel + 1)));
-            if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(0, sel - 1)));
+            if (e.key === "ArrowDown") (e.preventDefault(), setSel(Math.min(filtered.length - 1, cur + 1)));
+            if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(0, cur - 1)));
             if (e.key === "Enter") {
               // read the live input value: Enter can arrive before React re-rendered the last keystroke
               const live = e.currentTarget.value;
-              const cmd = live === q ? filtered[sel] : filterFor(live)[0];
+              const cmd = live === q ? filtered[cur] : filterFor(live)[0];
               if (cmd) {
                 cmd.run();
                 close();
@@ -217,7 +220,7 @@ export function CommandPalette() {
         />
         <ul id="palette-list" role="listbox">
           {filtered.map((c, i) => (
-            <li key={i} id={`cmd-${i}`} role="option" aria-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => (c.run(), close())}>
+            <li key={i} id={`cmd-${i}`} role="option" aria-selected={i === cur} onMouseEnter={() => setSel(i)} onClick={() => (c.run(), close())}>
               <span className="group">{c.group}</span>
               <span>{c.label}</span>
             </li>
@@ -296,7 +299,7 @@ const TOUR: Array<{ sel: string; title: string; text: string }> = [
   { sel: "[data-tour=file]", title: "The analysed file", text: "Name, duration and SHA-256 fingerprint — included in every export so results can be reproduced exactly." },
   { sel: "[data-tour=nav]", title: "The views", text: features.requirements ? "Replay, then one view per sub-challenge: inventory (2.1), causality (2.2), consistency (2.3), requirements (2.4), safety (2.5), bugs and notes (2.6–2.7)." : "Replay, then the analysis views: inventory (2.1), causality & latency (2.2), content quality and FOV consistency (2.3)." },
   { sel: "[data-tour=transport]", title: "Synchronised playback", text: "Play, frame-by-frame stepping on a topic, speeds, time source (log or header.stamp), A/B cursors." },
-  { sel: "[data-tour=panels]", title: "Inputs | Outputs FOV 1 | Outputs FOV 2", text: "Each panel shows the message at the current moment, its age and its status (OK / late / stale / empty / invalid)." },
+  { sel: "[data-tour=panels]", title: "One row per field of view", text: "Inputs first, then outputs. Each panel shows the message at the current moment, its header.stamp, its age and its status (OK / late / stale when older than k × its period / empty / invalid)." },
   { sel: "[data-tour=timeline]", title: "Timeline", text: features.requirements ? "Every message is a tick; gaps are red, requirement violations shaded, report failures marked with ▲. Click to jump." : "Every message is a tick; gaps are red, empty or invalid messages are highlighted. Click to jump." },
 ];
 
